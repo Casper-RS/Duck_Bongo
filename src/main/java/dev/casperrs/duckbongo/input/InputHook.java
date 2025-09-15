@@ -6,8 +6,10 @@ import com.github.kwhat.jnativehook.keyboard.*;
 import com.github.kwhat.jnativehook.mouse.*;
 import dev.casperrs.duckbongo.core.PointsManager;
 
+import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.Set;
 
 public class InputHook implements NativeKeyListener, NativeMouseInputListener {
     private final PointsManager points;
@@ -29,7 +31,17 @@ public class InputHook implements NativeKeyListener, NativeMouseInputListener {
         GlobalScreen.unregisterNativeHook();
     }
 
-    @Override public void nativeKeyPressed(NativeKeyEvent e) { points.add(1); }
+    private Set<Integer> pressedKeys =  new HashSet<Integer>();
+
+    @Override public void nativeKeyPressed(NativeKeyEvent e) {
+        if (!pressedKeys.contains(e.getKeyCode())) {
+            points.add(1);
+            pressedKeys.add(e.getKeyCode());
+        }
+    }
+    @Override public void nativeKeyReleased(NativeKeyEvent e) {
+        pressedKeys.remove(e.getKeyCode());
+    }
     @Override public void nativeMousePressed(NativeMouseEvent e) { points.add(1); }
     @Override public void nativeMouseDragged(NativeMouseEvent e) { /* eventueel throttle */ }
     @Override public void nativeMouseMoved(NativeMouseEvent e) { /* ignore */ }
