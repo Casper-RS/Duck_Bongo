@@ -114,6 +114,7 @@ public class DuckOverlay {
         scene.setFill(null);
 
         stage.initStyle(StageStyle.TRANSPARENT);
+        stage.getIcons().add(new Image("/assets/program_icon.png"));
         stage.setAlwaysOnTop(true);
         stage.setScene(scene);
 
