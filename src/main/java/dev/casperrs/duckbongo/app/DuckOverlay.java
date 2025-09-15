@@ -19,6 +19,13 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
+import javafx.geometry.Rectangle2D;
+import javafx.scene.layout.HBox;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+
 import java.net.URL;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -31,6 +38,7 @@ public class DuckOverlay {
     private static final int BAR_WIDTH  = 100;
     private static final int BAR_HEIGHT = 28;
     private static final int OVERLAP    = 23;
+    private static final int MENU_ICON  = 28;
 
     // drag state
     // add near your other fields
@@ -39,12 +47,12 @@ public class DuckOverlay {
     private double pressScreenX, pressScreenY;
     private boolean didDrag;
 
+    private final ContextMenu menu;
     private final Stage stage;
     private final ImageView duck;
     private final StackPane counterBar;  // background + label (+ bubble)
     private final Label counterText;
     private final PointsManager points;
-    private LongSupplier remainingSeconds; // provided by MainApp
 
     public DuckOverlay(Stage stage, PointsManager points) {
         this.stage = stage;
@@ -59,34 +67,49 @@ public class DuckOverlay {
         // Counter bar
         counterText = new Label(format(points.get()));
         counterText.setStyle("-fx-text-fill:#1f2428;-fx-font-size:12px;-fx-font-weight:bold;");
+        this.menu = buildContextMenu();
 
         Region bg = new Region();
         bg.setPrefSize(BAR_WIDTH, BAR_HEIGHT);
         bg.setMinSize(BAR_WIDTH, BAR_HEIGHT);
         bg.setMaxSize(BAR_WIDTH, BAR_HEIGHT);
         bg.setStyle("""
-          -fx-background-color:#dfe6ed;
-          -fx-background-radius:8;
-          -fx-border-color:#3a4147;
-          -fx-border-width:2;
-          -fx-border-radius:8;
-          -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
+        -fx-background-color:#dfe6ed;
+        -fx-background-radius:8;
+        -fx-border-color:#3a4147;
+        -fx-border-width:2;
+        -fx-border-radius:8;
+        -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
         """);
 
+        StackPane hamburgerButton = buildHamburgerButton();
+
+        StackPane labelWrap = new StackPane(counterText);
+        StackPane.setAlignment(counterText, Pos.CENTER_LEFT);
+        labelWrap.setPadding(new Insets(0, MENU_ICON + 10, 0, 10));
+
         counterBar = new StackPane(bg, counterText);
+        StackPane.setAlignment(counterText, Pos.CENTER);
         counterBar.setPadding(new Insets(0));
         counterBar.setPickOnBounds(true);
-        counterBar.setTranslateY(-OVERLAP);
+
+        // Horizontale Layout
+        HBox barRow = new HBox(6, counterBar, hamburgerButton);
+        barRow.setAlignment(Pos.CENTER);
+        barRow.setTranslateY(-OVERLAP);      // i.p.v. de translate op counterBar zelf
         duck.setTranslateY(OVERLAP / 3.0);
 
-        // Layout
-        VBox column = new VBox(0, duck, counterBar);
+        // Verticale layout. (Badeend boven counter)
+        VBox column = new VBox(0, duck, barRow);
         column.setAlignment(Pos.CENTER);
         column.setPadding(new Insets(4, 8, 8, 8));
         Group root = new Group(column);
 
-        int sceneW = Math.max(DUCK_WIDTH, BAR_WIDTH) + 20;
+        // Totale lengte definieren
+        int sceneW = Math.max(DUCK_WIDTH, BAR_WIDTH + 6 + MENU_ICON) + 20;
+        // Totale hoogte definieren
         int sceneH = (int) (img.getHeight() + BAR_HEIGHT + 28);
+        // Scene aanmaken met breedte en hoogte.
         Scene scene = new Scene(root, sceneW, sceneH);
         scene.setFill(null);
 
@@ -119,8 +142,6 @@ public class DuckOverlay {
 
         counterText.setText(format(points.get()));
     }
-
-    public void refresh() { counterText.setText(format(points.get())); }
 
     // --- Dragging & click handling ---
     private void enableWindowDrag(Scene scene) {
@@ -173,4 +194,108 @@ public class DuckOverlay {
         df.setDecimalFormatSymbols(sym);
         return df.format(n);
     }
+
+    private void snapBottomRight() {
+        Rectangle2D vb = Screen.getPrimary().getVisualBounds();
+        stage.setX(vb.getMaxX() - stage.getWidth() - 20);
+        stage.setY(vb.getMaxY() - stage.getHeight() - 18);
+
+    }
+
+    private StackPane buildHamburgerButton() {
+        // Drie horizontale lijntjes
+        Region line1 = new Region();
+        Region line2 = new Region();
+        Region line3 = new Region();
+        for (Region r : new Region[]{line1, line2, line3}) {
+            r.setPrefSize(MENU_ICON - 10, 2);
+            r.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+            r.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+            r.setStyle("-fx-background-color:#3a4147; -fx-background-radius:1;");
+        }
+
+        VBox lines = new VBox(4, line1, line2, line3);
+        lines.setAlignment(Pos.CENTER);
+
+        // Achtergrond net als counterBar
+        Region bg = new Region();
+        bg.setPrefSize(MENU_ICON, MENU_ICON);
+        bg.setMinSize(MENU_ICON, MENU_ICON);
+        bg.setMaxSize(MENU_ICON, MENU_ICON);
+        bg.setStyle("""
+        -fx-background-color:#dfe6ed;
+        -fx-background-radius:8;
+        -fx-border-color:#3a4147;
+        -fx-border-width:2;
+        -fx-border-radius:8;
+        -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
+    """);
+
+        // StackPane met background + icon
+        StackPane button = new StackPane(bg, lines);
+        button.setPrefSize(MENU_ICON, MENU_ICON);
+        button.setMinSize(MENU_ICON, MENU_ICON);
+        button.setMaxSize(MENU_ICON, MENU_ICON);
+        button.setPickOnBounds(true);
+
+        // Hover feedback (lichtgrijze overlay)
+        button.setOnMouseEntered(e ->
+                bg.setStyle("""
+                -fx-background-color:#e6ecf2;
+                -fx-background-radius:8;
+                -fx-border-color:#3a4147;
+                -fx-border-width:2;
+                -fx-border-radius:8;
+                -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
+            """)
+        );
+        button.setOnMouseExited(e ->
+                bg.setStyle("""
+                -fx-background-color:#dfe6ed;
+                -fx-background-radius:8;
+                -fx-border-color:#3a4147;
+                -fx-border-width:2;
+                -fx-border-radius:8;
+                -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
+            """)
+        );
+
+        // ContextMenu openen
+        button.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
+            e.consume(); // Voorkomt dat de bar-click dit als klik ziet
+        });
+        button.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> {
+            e.consume();
+            var screenBounds = button.localToScreen(button.getBoundsInLocal());
+            if (menu.isShowing()) {
+                menu.hide();
+            }
+            menu.show(button, screenBounds.getMaxX(), screenBounds.getMinY());
+        });
+
+        return button;
+    }
+
+    /** ContextMenu met wat handige acties. Pas aan naar wens. */
+    private ContextMenu buildContextMenu() {
+        MenuItem copyCount = new MenuItem("Copy count");
+        copyCount.setOnAction(e -> {
+            ClipboardContent content = new ClipboardContent();
+            content.putString(Long.toString(points.get()));
+            Clipboard.getSystemClipboard().setContent(content);
+        });
+
+        MenuItem toggleTop = new MenuItem("Toggle always-on-top");
+        toggleTop.setOnAction(e -> stage.setAlwaysOnTop(!stage.isAlwaysOnTop()));
+
+        MenuItem snapBR = new MenuItem("Snap bottom-right");
+        snapBR.setOnAction(e -> snapBottomRight());
+
+        MenuItem exit = new MenuItem("Exit");
+        exit.setOnAction(e -> stage.close());
+
+        ContextMenu cm = new ContextMenu(copyCount, toggleTop, snapBR, exit);
+        return cm;
+    }
+
 }
