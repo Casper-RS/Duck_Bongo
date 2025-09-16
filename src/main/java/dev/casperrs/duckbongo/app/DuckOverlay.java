@@ -288,6 +288,11 @@ public class DuckOverlay {
         imageSwitcher();
     }
 
+    private void setSkinDefault() {
+        this.skin = "/assets/duck_idle.png";
+        imageSwitcher();
+    }
+
     private void imageSwitcher() {
         URL url = Objects.requireNonNull(
                 DuckOverlay.class.getResource(skin),
@@ -299,7 +304,9 @@ public class DuckOverlay {
     private void skinSubMenuItems(Menu skinSubMenu) {
         MenuItem zwartWit = new MenuItem("Zwart-wit");
         zwartWit.setOnAction(e -> setSkinZwartWit());
-        skinSubMenu.getItems().addAll(zwartWit);
+        MenuItem standaard = new MenuItem("Standaard");
+        standaard.setOnAction(e -> setSkinDefault());
+        skinSubMenu.getItems().addAll(zwartWit, standaard);
     }
 
     /** ContextMenu met wat handige acties. Pas aan naar wens. */
