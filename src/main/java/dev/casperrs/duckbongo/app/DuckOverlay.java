@@ -15,8 +15,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
-import javafx.scene.Cursor;
-import javafx.scene.Node;
 import javafx.util.Duration;
 
 import javafx.animation.*;
@@ -160,7 +158,7 @@ public class DuckOverlay {
 
     // --- Dragging & click handling ---
     private void enableWindowDrag(Scene scene) {
-        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+        scene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
             pressScreenX = e.getScreenX();
             pressScreenY = e.getScreenY();
             dragOffsetX  = pressScreenX - stage.getX();
@@ -168,7 +166,7 @@ public class DuckOverlay {
             didDrag = false;
         });
 
-        scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
+        scene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, e -> {
             double dx = Math.abs(e.getScreenX() - pressScreenX);
             double dy = Math.abs(e.getScreenY() - pressScreenY);
             // require a bigger movement before we start dragging the window
@@ -179,13 +177,13 @@ public class DuckOverlay {
             }
         });
 
-        scene.addEventFilter(MouseEvent.MOUSE_RELEASED, e ->
-                scene.setCursor(Cursor.DEFAULT)
+        scene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e ->
+                scene.setCursor(javafx.scene.Cursor.DEFAULT)
         );
     }
 
     // Click bar to toggle live timer (ignore if it was a drag)
-    private void enableToggleOnBar(Node bar) {
+    private void enableToggleOnBar(javafx.scene.Node bar) {
         bar.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
             barPressScreenX = e.getScreenX();
             barPressScreenY = e.getScreenY();
@@ -291,16 +289,6 @@ public class DuckOverlay {
         return button;
     }
 
-    private void setSkinZwartWit() {
-        this.skin = "/assets/skins/duck_zwartWit.png";
-        imageSwitcher();
-    }
-
-    private void setSkinDefault() {
-        this.skin = "/assets/skins/duck_idle.png";
-        imageSwitcher();
-    }
-
     private void imageSwitcher() {
         URL url = Objects.requireNonNull(
                 DuckOverlay.class.getResource(skin),
@@ -314,6 +302,13 @@ public class DuckOverlay {
         for (String s : skins) {
             String skinName = s.replace("duck_", "").replace(".png", "").replace("_", " ");
             MenuItem mi = new MenuItem(skinName);
+
+            Image preview = new Image(
+                    getClass().getResourceAsStream("/assets/skins/" + s), 32, 32, true, true);
+
+            ImageView icon = new ImageView(preview);
+            mi.setGraphic(icon);
+
             mi.setOnAction(e -> {
                 this.skin = "/assets/skins/" + s;
                 imageSwitcher();
