@@ -22,7 +22,6 @@ public class MainApp extends Application {
 
         overlay = new DuckOverlay(stage, points);
         overlay.show();
-
         // Global input hooks
         InputHook hook = new InputHook(points);
         try { hook.start(); } catch (NativeHookException e) { e.printStackTrace(); }

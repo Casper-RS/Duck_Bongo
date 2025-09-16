@@ -47,6 +47,7 @@ public class DuckOverlay {
     private static final int BAR_HEIGHT = 22;
     private static final int OVERLAP    = 25;
     private static final int MENU_ICON  = 22;
+    private final ImageView breadIcon;
 
     // drag state
     // add near your other fields
@@ -62,66 +63,70 @@ public class DuckOverlay {
     private final Label counterText;
     private final PointsManager points;
 
+
     private String skin = "/assets/skins/duck_default.png";
 
     public DuckOverlay(Stage stage, PointsManager points) {
         this.stage = stage;
         this.points = points;
 
-
+        // Duck image
         URL url = Objects.requireNonNull(
                 DuckOverlay.class.getResource(skin),
                 "Missing resource: " + skin);
         Image img = new Image(url.toExternalForm(), DUCK_WIDTH, 0, true, true);
         this.duck = new ImageView(img);
 
-
         // Counter bar
         counterText = new Label(format(points.get()));
         counterText.setStyle("-fx-text-fill:#1f2428;-fx-font-size:12px;-fx-font-weight:bold;");
         this.menu = buildContextMenu();
+
+        // Bread icon
+        Image bread = new Image(getClass().getResourceAsStream("/assets/Bread.png"), 32, 32, true, true);
+        this.breadIcon = new ImageView(bread);
+        breadIcon.setVisible(false); // start hidden
 
         Region bg = new Region();
         bg.setPrefSize(BAR_WIDTH, BAR_HEIGHT);
         bg.setMinSize(BAR_WIDTH, BAR_HEIGHT);
         bg.setMaxSize(BAR_WIDTH, BAR_HEIGHT);
         bg.setStyle("""
-        -fx-background-color:#bad1e8;
-        -fx-background-radius:8;
-        -fx-border-color:#3a4147;
-        -fx-border-width:1;
-        -fx-border-radius:9;
-        -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
-        """);
+    -fx-background-color:#bad1e8;
+    -fx-background-radius:8;
+    -fx-border-color:#3a4147;
+    -fx-border-width:1;
+    -fx-border-radius:9;
+    -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
+    """);
 
         StackPane hamburgerButton = buildHamburgerButton();
-
-        StackPane labelWrap = new StackPane(counterText);
-        StackPane.setAlignment(counterText, Pos.CENTER_LEFT);
-        labelWrap.setPadding(new Insets(0, MENU_ICON + 10, 0, 10));
 
         counterBar = new StackPane(bg, counterText);
         StackPane.setAlignment(counterText, Pos.CENTER);
         counterBar.setPadding(new Insets(0));
         counterBar.setPickOnBounds(true);
 
-        // Horizontale Layout
+        // Layout: horizontal row with counter and menu button
         HBox barRow = new HBox(6, counterBar, hamburgerButton);
         barRow.setAlignment(Pos.CENTER);
-        barRow.setTranslateY(-OVERLAP);      // i.p.v. de translate op counterBar zelf
+        barRow.setTranslateY(-OVERLAP);
         duck.setTranslateY(OVERLAP / 3.0);
 
-        // Verticale layout. (Badeend boven counter)
-        VBox column = new VBox(0, duck, barRow);
-        column.setAlignment(Pos.CENTER);
+        // Duck + Bread side by side (bread on left)
+        HBox duckWithBread = new HBox(5, breadIcon, duck);
+        duckWithBread.setAlignment(Pos.CENTER);
+
+        // Column layout: duck+bread on top, barRow below
+        VBox column = new VBox(0, duckWithBread, barRow);
+        column.setAlignment(Pos.TOP_LEFT);
         column.setPadding(new Insets(2, 4, 4, 4));
+
         Group root = new Group(column);
 
-        // Totale lengte definieren
+        // Scene
         int sceneW = Math.max(DUCK_WIDTH, BAR_WIDTH + 5 + MENU_ICON) + 20;
-        // Totale hoogte definieren
         int sceneH = (int) (img.getHeight() + BAR_HEIGHT + 20);
-        // Scene aanmaken met breedte en hoogte.
         Scene scene = new Scene(root, sceneW, sceneH);
         scene.setFill(null);
 
@@ -137,11 +142,32 @@ public class DuckOverlay {
         // position
         stage.setX(20);
         stage.setY(Screen.getPrimary().getVisualBounds().getMaxY() - sceneH - 18);
+
+        // bread spawner (every 10 minutes → for testing set to 5s)
+        Timeline breadSpawner = new Timeline(
+                new KeyFrame(Duration.seconds(5), e -> spawnBread())
+        );
+        breadSpawner.setCycleCount(Animation.INDEFINITE);
+        breadSpawner.play();
     }
+
+    private void spawnBread() {
+        breadIcon.setVisible(true);
+
+        // optional: animate it appearing
+        FadeTransition fade = new FadeTransition(Duration.seconds(1), breadIcon);
+        fade.setFromValue(0);
+        fade.setToValue(1);
+        fade.play();
+
+    }
+
 
     public void show() {
         stage.show();
     }
+
+
 
 
     /** Punch animation + update counter text */
