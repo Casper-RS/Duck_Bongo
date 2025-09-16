@@ -279,6 +279,15 @@ public class DuckOverlay {
         return button;
     }
 
+    private void skinSwitcher() {
+        this.skin = "/assets/duck_zwartWit.png";
+        URL url2 = Objects.requireNonNull(
+                DuckOverlay.class.getResource(skin),
+                "Missing resource: " + skin);
+        Image img2 = new Image(url2.toExternalForm(), DUCK_WIDTH, 0, true, true);
+        this.duck.setImage(img2);
+    }
+
     /** ContextMenu met wat handige acties. Pas aan naar wens. */
     private ContextMenu buildContextMenu() {
         MenuItem copyCount = new MenuItem("Copy count");
@@ -289,16 +298,7 @@ public class DuckOverlay {
         });
 
         MenuItem skinSwitch = new MenuItem("SkinSwitch");
-        skinSwitch.setOnAction(e -> {
-            this.skin = "/assets/duck_zwartWit.png";
-            URL url2 = Objects.requireNonNull(
-                    DuckOverlay.class.getResource(skin),
-                    "Missing resource: /assets/duck_idle.png");
-            Image img2 = new Image(url2.toExternalForm(), DUCK_WIDTH, 0, true, true);
-            this.duck.setImage(img2);
-            System.out.println(this.skin);
-        });
-
+        skinSwitch.setOnAction(e -> {skinSwitcher();});
 
         MenuItem toggleTop = new MenuItem("Toggle always-on-top");
         toggleTop.setOnAction(e -> stage.setAlwaysOnTop(!stage.isAlwaysOnTop()));
