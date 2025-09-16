@@ -2,9 +2,11 @@
 package dev.casperrs.duckbongo.app;
 import dev.casperrs.duckbongo.core.PointsManager;
 
+import javax.swing.*;
 import java.net.URL;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import javafx.util.Duration;
@@ -20,6 +22,7 @@ import javafx.stage.StageStyle;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
+import javafx.scene.control.Menu;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Region;
@@ -52,6 +55,7 @@ public class DuckOverlay {
     private final StackPane counterBar;  // background + label (+ bubble)
     private final Label counterText;
     private final PointsManager points;
+
     private String skin = "/assets/duck_idle.png";
 
     public DuckOverlay(Stage stage, PointsManager points) {
@@ -64,6 +68,7 @@ public class DuckOverlay {
                 "Missing resource: /assets/duck_idle.png");
         Image img = new Image(url.toExternalForm(), DUCK_WIDTH, 0, true, true);
         this.duck = new ImageView(img);
+
 
         // Counter bar
         counterText = new Label(format(points.get()));
@@ -278,13 +283,23 @@ public class DuckOverlay {
         return button;
     }
 
-    private void skinSwitcher() {
+    private void setSkinZwartWit() {
         this.skin = "/assets/duck_zwartWit.png";
-        URL url2 = Objects.requireNonNull(
+        imageSwitcher();
+    }
+
+    private void imageSwitcher() {
+        URL url = Objects.requireNonNull(
                 DuckOverlay.class.getResource(skin),
                 "Missing resource: " + skin);
-        Image img2 = new Image(url2.toExternalForm(), DUCK_WIDTH, 0, true, true);
-        this.duck.setImage(img2);
+        Image img = new Image(url.toExternalForm(), DUCK_WIDTH, 0, true, true);
+        this.duck.setImage(img);
+    }
+
+    private void skinSubMenuItems(Menu skinSubMenu) {
+        MenuItem zwartWit = new MenuItem("Zwart-wit");
+        zwartWit.setOnAction(e -> setSkinZwartWit());
+        skinSubMenu.getItems().addAll(zwartWit);
     }
 
     /** ContextMenu met wat handige acties. Pas aan naar wens. */
@@ -296,9 +311,6 @@ public class DuckOverlay {
             Clipboard.getSystemClipboard().setContent(content);
         });
 
-        MenuItem skinSwitch = new MenuItem("SkinSwitch");
-        skinSwitch.setOnAction(e -> {skinSwitcher();});
-
         MenuItem toggleTop = new MenuItem("Toggle always-on-top");
         toggleTop.setOnAction(e -> stage.setAlwaysOnTop(!stage.isAlwaysOnTop()));
 
@@ -308,8 +320,16 @@ public class DuckOverlay {
         MenuItem exit = new MenuItem("Exit");
         exit.setOnAction(e -> stage.close());
 
-        ContextMenu cm = new ContextMenu(skinSwitch, copyCount, toggleTop, snapBR, exit);
+        Menu skinSubMenu = new Menu("Skins");
+        skinSubMenuItems(skinSubMenu);
+
+        ContextMenu cm = new ContextMenu(
+                skinSubMenu,
+                copyCount,
+                toggleTop,
+                snapBR,
+                exit
+        );
         return cm;
     }
-
 }
