@@ -2,13 +2,21 @@
 package dev.casperrs.duckbongo.app;
 import dev.casperrs.duckbongo.core.PointsManager;
 
-import javax.swing.*;
+import java.io.IOException;
 import java.net.URL;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+
+import javafx.scene.Cursor;
+import javafx.scene.Node;
 import javafx.util.Duration;
 
 import javafx.animation.*;
@@ -56,7 +64,7 @@ public class DuckOverlay {
     private final Label counterText;
     private final PointsManager points;
 
-    private String skin = "/assets/duck_idle.png";
+    private String skin = "/assets/skins/duck_default.png";
 
     public DuckOverlay(Stage stage, PointsManager points) {
         this.stage = stage;
@@ -65,7 +73,7 @@ public class DuckOverlay {
 
         URL url = Objects.requireNonNull(
                 DuckOverlay.class.getResource(skin),
-                "Missing resource: /assets/duck_idle.png");
+                "Missing resource: " + skin);
         Image img = new Image(url.toExternalForm(), DUCK_WIDTH, 0, true, true);
         this.duck = new ImageView(img);
 
@@ -152,7 +160,7 @@ public class DuckOverlay {
 
     // --- Dragging & click handling ---
     private void enableWindowDrag(Scene scene) {
-        scene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
+        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
             pressScreenX = e.getScreenX();
             pressScreenY = e.getScreenY();
             dragOffsetX  = pressScreenX - stage.getX();
@@ -160,7 +168,7 @@ public class DuckOverlay {
             didDrag = false;
         });
 
-        scene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, e -> {
+        scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
             double dx = Math.abs(e.getScreenX() - pressScreenX);
             double dy = Math.abs(e.getScreenY() - pressScreenY);
             // require a bigger movement before we start dragging the window
@@ -171,13 +179,13 @@ public class DuckOverlay {
             }
         });
 
-        scene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e ->
-                scene.setCursor(javafx.scene.Cursor.DEFAULT)
+        scene.addEventFilter(MouseEvent.MOUSE_RELEASED, e ->
+                scene.setCursor(Cursor.DEFAULT)
         );
     }
 
     // Click bar to toggle live timer (ignore if it was a drag)
-    private void enableToggleOnBar(javafx.scene.Node bar) {
+    private void enableToggleOnBar(Node bar) {
         bar.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
             barPressScreenX = e.getScreenX();
             barPressScreenY = e.getScreenY();
@@ -284,12 +292,12 @@ public class DuckOverlay {
     }
 
     private void setSkinZwartWit() {
-        this.skin = "/assets/duck_zwartWit.png";
+        this.skin = "/assets/skins/duck_zwartWit.png";
         imageSwitcher();
     }
 
     private void setSkinDefault() {
-        this.skin = "/assets/duck_idle.png";
+        this.skin = "/assets/skins/duck_idle.png";
         imageSwitcher();
     }
 
@@ -302,11 +310,33 @@ public class DuckOverlay {
     }
 
     private void skinSubMenuItems(Menu skinSubMenu) {
-        MenuItem zwartWit = new MenuItem("Zwart-wit");
-        zwartWit.setOnAction(e -> setSkinZwartWit());
-        MenuItem standaard = new MenuItem("Standaard");
-        standaard.setOnAction(e -> setSkinDefault());
-        skinSubMenu.getItems().addAll(zwartWit, standaard);
+        List<String> skins = foreachFileList();
+        for (String s : skins) {
+            String skinName = s.replace("duck_", "").replace(".png", "").replace("_", " ");
+            MenuItem mi = new MenuItem(skinName);
+            mi.setOnAction(e -> {
+                this.skin = "/assets/skins/" + s;
+                imageSwitcher();
+            });
+            skinSubMenu.getItems().add(mi);
+        }
+    }
+
+    private List <String> foreachFileList() {
+        Path folder = Paths.get("src/main/resources/assets/skins");   // your folder path
+        List<String> fileNames = new ArrayList<>();
+
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder)) {
+            for (Path path : stream) {
+                if (Files.isRegularFile(path)) {
+                    fileNames.add(path.getFileName().toString());
+                }
+            }
+        } catch (IOException IOE) {
+            IOE.printStackTrace();
+            return null;
+        }
+        return fileNames;
     }
 
     /** ContextMenu met wat handige acties. Pas aan naar wens. */
