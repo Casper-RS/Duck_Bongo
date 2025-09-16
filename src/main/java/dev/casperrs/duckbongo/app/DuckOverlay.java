@@ -53,13 +53,15 @@ public class DuckOverlay {
     private final StackPane counterBar;  // background + label (+ bubble)
     private final Label counterText;
     private final PointsManager points;
+    private String skin = "/assets/duck_idle.png";
 
     public DuckOverlay(Stage stage, PointsManager points) {
         this.stage = stage;
         this.points = points;
 
+
         URL url = Objects.requireNonNull(
-                DuckOverlay.class.getResource("/assets/duck_idle.png"),
+                DuckOverlay.class.getResource(skin),
                 "Missing resource: /assets/duck_idle.png");
         Image img = new Image(url.toExternalForm(), DUCK_WIDTH, 0, true, true);
         this.duck = new ImageView(img);
@@ -286,6 +288,18 @@ public class DuckOverlay {
             Clipboard.getSystemClipboard().setContent(content);
         });
 
+        MenuItem skinSwitch = new MenuItem("SkinSwitch");
+        skinSwitch.setOnAction(e -> {
+            this.skin = "/assets/duck_zwartWit.png";
+            URL url2 = Objects.requireNonNull(
+                    DuckOverlay.class.getResource(skin),
+                    "Missing resource: /assets/duck_idle.png");
+            Image img2 = new Image(url2.toExternalForm(), DUCK_WIDTH, 0, true, true);
+            this.duck.setImage(img2);
+            System.out.println(this.skin);
+        });
+
+
         MenuItem toggleTop = new MenuItem("Toggle always-on-top");
         toggleTop.setOnAction(e -> stage.setAlwaysOnTop(!stage.isAlwaysOnTop()));
 
@@ -295,7 +309,7 @@ public class DuckOverlay {
         MenuItem exit = new MenuItem("Exit");
         exit.setOnAction(e -> stage.close());
 
-        ContextMenu cm = new ContextMenu(copyCount, toggleTop, snapBR, exit);
+        ContextMenu cm = new ContextMenu(skinSwitch, copyCount, toggleTop, snapBR, exit);
         return cm;
     }
 
