@@ -15,6 +15,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Popup;
 import javafx.util.Duration;
 
 import javafx.animation.*;
@@ -27,16 +30,8 @@ import javafx.stage.StageStyle;
 
 import javafx.scene.Group;
 import javafx.scene.Scene;
-import javafx.scene.control.Label;
-import javafx.scene.control.Menu;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
-import javafx.scene.layout.HBox;
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.MenuItem;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.MouseEvent;
@@ -381,7 +376,14 @@ public class DuckOverlay {
         Menu skinSubMenu = new Menu("Skins");
         skinSubMenuItems(skinSubMenu);
 
+        MenuItem skinPopup = new MenuItem("skinPopup");
+        skinPopup.setOnAction(e -> {
+            showSkinPopup(stage, stage.getX() + 50, stage.getY() + 50);
+        });
+
+
         ContextMenu cm = new ContextMenu(
+                skinPopup,
                 skinSubMenu,
                 copyCount,
                 toggleTop,
@@ -389,5 +391,46 @@ public class DuckOverlay {
                 exit
         );
         return cm;
+    }
+
+    public void showSkinPopup(Stage owner, double x, double y) {
+        Popup popup = new Popup();
+        popup.setAutoHide(true); // closes when user clicks outside
+
+        TilePane tile = new TilePane();
+        tile.setPrefColumns(5);
+        tile.setHgap(10);
+        tile.setVgap(10);
+        tile.setPadding(new Insets(10));
+        tile.setStyle("-fx-background-color: white; -fx-border-color: gray; -fx-border-width: 1;");
+
+        List<String> skins = foreachFileList(); // supply your own list of file names
+        for (String s : skins) {
+            Image img = new Image(getClass().getResourceAsStream("/assets/skins/" + s),
+                    64, 64, true, true);
+            ImageView iv = new ImageView(img);
+            Label label = new Label(s.replace("duck_", "").replace(".png", ""));
+            label.setAlignment(Pos.CENTER);
+
+            StackPane cell = new StackPane(iv);
+            cell.setPadding(new Insets(4));
+            cell.setStyle("-fx-background-color: transparent;");
+            cell.setOnMouseEntered(e ->
+                    cell.setStyle("-fx-background-color: rgba(0,0,0,0.1); -fx-background-radius: 6;")
+            );
+            cell.setOnMouseExited(e -> cell.setStyle("-fx-background-color: transparent;"));
+
+            cell.setOnMouseClicked(e -> {
+                skin = "/assets/skins/" + s;
+                imageSwitcher();        // your method to change the image
+                popup.hide();
+            });
+
+            tile.getChildren().add(cell);
+        }
+
+        popup.getContent().add(tile);
+        popup.show(owner, x+200, y-150);
+
     }
 }
