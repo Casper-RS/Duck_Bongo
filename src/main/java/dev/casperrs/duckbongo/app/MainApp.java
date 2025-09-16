@@ -10,16 +10,15 @@ import javafx.application.Application;
 import javafx.stage.Stage;
 
 public class MainApp extends Application {
-    private final PointsManager points = new PointsManager();
     private DuckOverlay overlay;
     private long lastPointsSeen = 0;
 
-    private DataHandler dataHandler;
-
+    PointsManager points = new PointsManager();
+    DataHandler dataHandler = new DataHandler(points);
     @Override
     public void start(Stage stage) {
         dataHandler = new DataHandler(points);
-        dataHandler.load();
+        dataHandler.initAndLoad();
 
         overlay = new DuckOverlay(stage, points);
         overlay.show();
@@ -47,5 +46,7 @@ public class MainApp extends Application {
         }
     }
 
-    public static void main(String[] args) { launch(args); }
+    public static void main(String[] args) {
+        launch(args);
+    }
 }
