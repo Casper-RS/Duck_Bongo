@@ -36,11 +36,11 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.MouseEvent;
 
 public class DuckOverlay {
-    private static final int DUCK_WIDTH = 120;
+    private static final int DUCK_WIDTH = 160;
     private static final int BAR_WIDTH  = 100;
-    private static final int BAR_HEIGHT = 28;
+    private static final int BAR_HEIGHT = 22;
     private static final int OVERLAP    = 23;
-    private static final int MENU_ICON  = 28;
+    private static final int MENU_ICON  = 22;
 
     // drag state
     // add near your other fields
@@ -80,11 +80,11 @@ public class DuckOverlay {
         bg.setMinSize(BAR_WIDTH, BAR_HEIGHT);
         bg.setMaxSize(BAR_WIDTH, BAR_HEIGHT);
         bg.setStyle("""
-        -fx-background-color:#dfe6ed;
+        -fx-background-color:#bad1e8;
         -fx-background-radius:8;
         -fx-border-color:#3a4147;
-        -fx-border-width:2;
-        -fx-border-radius:8;
+        -fx-border-width:1;
+        -fx-border-radius:9;
         -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
         """);
 
@@ -112,7 +112,7 @@ public class DuckOverlay {
         Group root = new Group(column);
 
         // Totale lengte definieren
-        int sceneW = Math.max(DUCK_WIDTH, BAR_WIDTH + 6 + MENU_ICON) + 20;
+        int sceneW = Math.max(DUCK_WIDTH, BAR_WIDTH + 5 + MENU_ICON) + 20;
         // Totale hoogte definieren
         int sceneH = (int) (img.getHeight() + BAR_HEIGHT + 28);
         // Scene aanmaken met breedte en hoogte.
@@ -215,7 +215,7 @@ public class DuckOverlay {
         Region line2 = new Region();
         Region line3 = new Region();
         for (Region r : new Region[]{line1, line2, line3}) {
-            r.setPrefSize(MENU_ICON - 10, 2);
+            r.setPrefSize(MENU_ICON - 5, 1);
             r.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
             r.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
             r.setStyle("-fx-background-color:#3a4147; -fx-background-radius:1;");
@@ -230,11 +230,11 @@ public class DuckOverlay {
         bg.setMinSize(MENU_ICON, MENU_ICON);
         bg.setMaxSize(MENU_ICON, MENU_ICON);
         bg.setStyle("""
-        -fx-background-color:#dfe6ed;
-        -fx-background-radius:8;
+        -fx-background-color:#bad1e8;
+        -fx-background-radius:1;
         -fx-border-color:#3a4147;
-        -fx-border-width:2;
-        -fx-border-radius:8;
+        -fx-border-width:1;
+        -fx-border-radius:1;
         -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
     """);
 
@@ -248,21 +248,21 @@ public class DuckOverlay {
         // Hover feedback (lichtgrijze overlay)
         button.setOnMouseEntered(e ->
                 bg.setStyle("""
-                -fx-background-color:#e6ecf2;
-                -fx-background-radius:8;
+                -fx-background-color:#bad1e8;
+                -fx-background-radius:3;
                 -fx-border-color:#3a4147;
-                -fx-border-width:2;
-                -fx-border-radius:8;
+                -fx-border-width:1;
+                -fx-border-radius:3;
                 -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
             """)
         );
         button.setOnMouseExited(e ->
                 bg.setStyle("""
-                -fx-background-color:#dfe6ed;
-                -fx-background-radius:8;
-                -fx-border-color:#3a4147;
-                -fx-border-width:2;
-                -fx-border-radius:8;
+                -fx-background-color:#bad1e8;
+                -fx-background-radius:1;
+                -fx-border-color:#9ea1a3;
+                -fx-border-width:1;
+                -fx-border-radius:1;
                 -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
             """)
         );
