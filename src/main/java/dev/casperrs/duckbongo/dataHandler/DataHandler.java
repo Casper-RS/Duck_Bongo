@@ -112,15 +112,16 @@ public class DataHandler {
     private String promptUniqueUsername() throws SQLException {
         while (true) {
             TextInputDialog dialog = new TextInputDialog();
-            dialog.setTitle("DuckBongo – Welcome");
-            dialog.setHeaderText("Welcome, please set a username!");
+            dialog.setTitle("DuckBongo – Welcome!");
+            dialog.setHeaderText("Please pick a username.");
             dialog.setContentText("Username:");
 
             String name = dialog.showAndWait().map(String::trim).orElse("");
             if (name.isEmpty()) continue;
 
-            if (findByUsernameFree(name)) {
-                dialog.setHeaderText("This username is already in use. Please pick another name.");
+            if (data.findByUsername(name).isPresent()) {
+                // bestaat al → opnieuw vragen
+                dialog.setHeaderText("Username is already in use. Please pick another name.");
                 continue;
             }
             return name;
