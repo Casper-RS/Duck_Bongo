@@ -36,10 +36,10 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.MouseEvent;
 
 public class DuckOverlay {
-    private static final int DUCK_WIDTH = 160;
+    private static final int DUCK_WIDTH = 140;
     private static final int BAR_WIDTH  = 100;
     private static final int BAR_HEIGHT = 22;
-    private static final int OVERLAP    = 23;
+    private static final int OVERLAP    = 25;
     private static final int MENU_ICON  = 22;
 
     // drag state
@@ -108,13 +108,13 @@ public class DuckOverlay {
         // Verticale layout. (Badeend boven counter)
         VBox column = new VBox(0, duck, barRow);
         column.setAlignment(Pos.CENTER);
-        column.setPadding(new Insets(4, 8, 8, 8));
+        column.setPadding(new Insets(2, 4, 4, 4));
         Group root = new Group(column);
 
         // Totale lengte definieren
         int sceneW = Math.max(DUCK_WIDTH, BAR_WIDTH + 5 + MENU_ICON) + 20;
         // Totale hoogte definieren
-        int sceneH = (int) (img.getHeight() + BAR_HEIGHT + 28);
+        int sceneH = (int) (img.getHeight() + BAR_HEIGHT + 20);
         // Scene aanmaken met breedte en hoogte.
         Scene scene = new Scene(root, sceneW, sceneH);
         scene.setFill(null);
@@ -191,12 +191,12 @@ public class DuckOverlay {
                 e.consume();
             }
         });
-    }
 
+}
     // formatting: thin-space grouping (e.g., 1 000 000)
     private static String format(long n) {
         DecimalFormatSymbols sym = new DecimalFormatSymbols(Locale.ROOT);
-        sym.setGroupingSeparator(' ');
+        sym.setGroupingSeparator('.');
         DecimalFormat df = new DecimalFormat("#,###");
         df.setDecimalFormatSymbols(sym);
         return df.format(n);
@@ -248,21 +248,21 @@ public class DuckOverlay {
         // Hover feedback (lichtgrijze overlay)
         button.setOnMouseEntered(e ->
                 bg.setStyle("""
-                -fx-background-color:#bad1e8;
-                -fx-background-radius:3;
+                -fx-background-color:#cce1ed;
+                -fx-background-radius:2;
                 -fx-border-color:#3a4147;
                 -fx-border-width:1;
-                -fx-border-radius:3;
+                -fx-border-radius:2;
                 -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
             """)
         );
         button.setOnMouseExited(e ->
                 bg.setStyle("""
                 -fx-background-color:#bad1e8;
-                -fx-background-radius:1;
+                -fx-background-radius:2;
                 -fx-border-color:#9ea1a3;
                 -fx-border-width:1;
-                -fx-border-radius:1;
+                -fx-border-radius:2;
                 -fx-effect:dropshadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
             """)
         );
