@@ -412,7 +412,9 @@ public class DuckOverlay {
             Label label = new Label(s.replace("duck_", "").replace(".png", ""));
             label.setAlignment(Pos.CENTER);
 
-            StackPane cell = new StackPane(iv);
+            VBox vbox = new VBox(iv, label);
+            vbox.setAlignment(Pos.CENTER);
+            StackPane cell = new StackPane(vbox);
             cell.setPadding(new Insets(4));
             cell.setStyle("-fx-background-color: transparent;");
             cell.setOnMouseEntered(e ->
