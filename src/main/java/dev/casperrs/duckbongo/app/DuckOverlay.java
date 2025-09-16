@@ -402,7 +402,37 @@ public class DuckOverlay {
         tile.setHgap(10);
         tile.setVgap(10);
         tile.setPadding(new Insets(10));
-        tile.setStyle("-fx-background-color: white; -fx-border-color: gray; -fx-border-width: 1;");
+
+        String basicStyle = """
+             -fx-background-color: white;
+             -fx-border-color: gray;
+             -fx-border-width: 1;
+        """;
+
+        String classicStyle = """
+            -fx-background-color: linear-gradient(to bottom right, #ffecd2, #fcb69f);
+            -fx-border-color: #ff8c42;
+            -fx-border-width: 3;
+            -fx-border-radius: 12;
+            -fx-background-radius: 12;
+            -fx-padding: 15;
+        """;
+
+        String duckyStyle = """
+            -fx-background-color: linear-gradient(to bottom right, #b3ecff, #80dfff, #4dd2ff);
+            -fx-background-insets: 0, 1;
+            -fx-background-radius: 20;
+            -fx-border-color: #ffeb3b;
+            -fx-border-radius: 20;
+            -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 12, 0.3, 0, 3);
+            -fx-padding: 15;
+        """;
+
+        String style = duckyStyle;
+        tile.setStyle(style);
+
+
+
 
         List<String> skins = foreachFileList(); // supply your own list of file names
         for (String s : skins) {
@@ -430,9 +460,24 @@ public class DuckOverlay {
 
             tile.getChildren().add(cell);
         }
+        StackPane styleDemo = new StackPane(new Label("Style demo"));
+        styleDemo.setPrefSize(100, 50);
+        styleDemo.setOnMouseEntered(e ->
+                styleDemo.setStyle("-fx-background-color: rgba(0,0,0,0.1); -fx-background-radius: 6;")
+        );
+        styleDemo.setOnMouseExited(e -> styleDemo.setStyle("-fx-background-color: transparent;"));
+        styleDemo.setOnMouseClicked(e -> {
+            if (tile.getStyle().equals(basicStyle)) {
+                tile.setStyle(classicStyle);
+            } else if (tile.getStyle().equals(classicStyle)) {
+                tile.setStyle(duckyStyle);
+            } else {
+                tile.setStyle(basicStyle);
+            }
+        });
+        tile.getChildren().add(styleDemo);
 
         popup.getContent().add(tile);
         popup.show(owner, x+200, y-150);
-
     }
 }
