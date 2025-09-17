@@ -108,9 +108,21 @@ public class DuckOverlay {
         barRow.setTranslateY(-OVERLAP);
         duck.setTranslateY(OVERLAP / 3.0);
 
-        // Duck + Bread side by side (bread on left)
-        HBox duckWithBread = new HBox(5, breadIcon, duck);
-        duckWithBread.setAlignment(Pos.CENTER);
+        // BROOD
+        StackPane duckWithBread = new StackPane();
+        duckWithBread.getChildren().addAll(duck, breadIcon);
+
+        duckWithBread.setMinSize(DUCK_WIDTH, img.getHeight());
+        duckWithBread.setPrefSize(DUCK_WIDTH, img.getHeight());
+        duckWithBread.setMaxSize(DUCK_WIDTH, img.getHeight());
+        duckWithBread.setAlignment(Pos.CENTER_LEFT);
+
+        StackPane.setAlignment(breadIcon, Pos.CENTER_LEFT);
+
+        breadIcon.setTranslateX(6);   // schuif iets richting midden van de duck
+        breadIcon.setTranslateY(-4);  // optioneel: iets omhoog voor speels effect
+
+        breadIcon.setPickOnBounds(false);
 
         // Column layout: duck+bread on top, barRow below
         VBox column = new VBox(0, duckWithBread, barRow);
