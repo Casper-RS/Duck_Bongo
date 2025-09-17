@@ -336,7 +336,7 @@ public class DuckOverlay {
 
     }
 
-    private WritableImage imagetest() {
+    private void imagetest() {
         URL u1 = Objects.requireNonNull(
                 getClass().getResource("/assets/skin_parts/duckPart_water.png")
         );
@@ -369,9 +369,6 @@ public class DuckOverlay {
         duck.setImage(combined);
         duck.setFitWidth(DUCK_WIDTH);
         duck.setPreserveRatio(true);
-
-
-        return combined;
     }
 
 
