@@ -15,7 +15,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
+
+import javafx.scene.SnapshotParameters;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.*;
 import javafx.stage.Popup;
 import javafx.util.Duration;
@@ -328,7 +333,47 @@ public class DuckOverlay {
                 "Missing resource: " + skin);
         Image img = new Image(url.toExternalForm(), DUCK_WIDTH, 0, true, true);
         this.duck.setImage(img);
+
     }
+
+    private WritableImage imagetest() {
+        URL u1 = Objects.requireNonNull(
+                getClass().getResource("/assets/skin_parts/duckPart_water.png")
+        );
+        URL u2 = Objects.requireNonNull(
+                getClass().getResource("/assets/skin_parts/duckPart_duck.png")
+        );
+
+        // force synchronous load
+        Image img1 = new Image(u1.toExternalForm(), 0, 0, true, true, false);
+        Image img2 = new Image(u2.toExternalForm(), 0, 0, true, true, false);
+
+        double width  = Math.max(img1.getWidth(), img2.getWidth());
+        double height = Math.max(img1.getHeight(), img2.getHeight());
+
+        Canvas canvas = new Canvas(width, height);
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+
+        gc.clearRect(0, 0, width, height);
+
+        gc.drawImage(img1, 0, 0);
+        gc.drawImage(img2, 0, 0);
+
+        WritableImage combined = new WritableImage((int) width, (int) height);
+        // 3️⃣  Snapshot with a transparent background
+        SnapshotParameters params = new SnapshotParameters();
+        params.setFill(javafx.scene.paint.Color.TRANSPARENT);
+
+        canvas.snapshot(params, combined);
+
+        duck.setImage(combined);
+        duck.setFitWidth(DUCK_WIDTH);
+        duck.setPreserveRatio(true);
+
+
+        return combined;
+    }
+
 
     private void skinSubMenuItems(Menu skinSubMenu) {
         List<String> skins = foreachFileList();
@@ -376,6 +421,9 @@ public class DuckOverlay {
             Clipboard.getSystemClipboard().setContent(content);
         });
 
+        MenuItem changeToSplitSkin = new MenuItem("Change to split skin");
+        changeToSplitSkin.setOnAction(e -> {imagetest();});
+
         MenuItem toggleTop = new MenuItem("Toggle always-on-top");
         toggleTop.setOnAction(e -> stage.setAlwaysOnTop(!stage.isAlwaysOnTop()));
 
@@ -395,6 +443,7 @@ public class DuckOverlay {
 
 
         ContextMenu cm = new ContextMenu(
+                changeToSplitSkin,
                 skinPopup,
                 skinSubMenu,
                 copyCount,
