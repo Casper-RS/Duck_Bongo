@@ -67,17 +67,22 @@ public class DuckOverlay {
 
 
     private String skin = "/assets/skins/duck_default.png";
+    private String waterSkin = "/assets/skin_parts/waters/water_default.png";
+    private String duckSkin = "/assets/skin_parts/ducks/duck_default.png";
 
     public DuckOverlay(Stage stage, PointsManager points) {
         this.stage = stage;
         this.points = points;
 
-        // Duck image
-        URL url = Objects.requireNonNull(
-                DuckOverlay.class.getResource(skin),
-                "Missing resource: " + skin);
+        URL url = Objects.requireNonNull(DuckOverlay.class.getResource(duckSkin), "Missing resource: " + duckSkin);
         Image img = new Image(url.toExternalForm(), DUCK_WIDTH, 0, true, true);
         this.duck = new ImageView(img);
+
+
+        imageSwitcher();
+
+
+
 
         // Counter bar
         counterText = new Label(format(points.get()));
@@ -329,37 +334,24 @@ public class DuckOverlay {
         return button;
     }
 
-    private void imageSwitcher() {
-        URL url = Objects.requireNonNull(
-                DuckOverlay.class.getResource(skin),
-                "Missing resource: " + skin);
-        Image img = new Image(url.toExternalForm(), DUCK_WIDTH, 0, true, true);
-        this.duck.setImage(img);
 
-    }
+    private Image imageSwitcher() {
+        URL duckURL = Objects.requireNonNull(getClass().getResource(duckSkin));
+        URL waterURL = Objects.requireNonNull(getClass().getResource(waterSkin));
 
-    private void imagetest() {
-        URL u1 = Objects.requireNonNull(
-                getClass().getResource("/assets/skin_parts/duckPart_water.png")
-        );
-        URL u2 = Objects.requireNonNull(
-                getClass().getResource("/assets/skin_parts/my-image.png")
-        );
+        Image duckImg  = new Image(duckURL.toExternalForm(), 0, 0, true, true, false);
+        Image waterImg = new Image(waterURL.toExternalForm(), 0, 0, true, true, false);
 
-        // force synchronous load
-        Image img1 = new Image(u1.toExternalForm(), 0, 0, true, true, false);
-        Image img2 = new Image(u2.toExternalForm(), 0, 0, true, true, false);
-
-        double width  = Math.max(img1.getWidth(), img2.getWidth());
-        double height = Math.max(img1.getHeight(), img2.getHeight());
+        double width  = Math.max(duckImg.getWidth(), waterImg.getWidth());
+        double height = Math.max(duckImg.getHeight(), waterImg.getHeight());
 
         Canvas canvas = new Canvas(width, height);
         GraphicsContext gc = canvas.getGraphicsContext2D();
 
         gc.clearRect(0, 0, width, height);
 
-        gc.drawImage(img1, 0, 0);
-        gc.drawImage(img2, 0, 0);
+        gc.drawImage(waterImg, 0, 0);
+        gc.drawImage(duckImg, 0, 0);
 
         WritableImage combined = new WritableImage((int) width, (int) height);
         // 3️⃣  Snapshot with a transparent background
@@ -371,11 +363,12 @@ public class DuckOverlay {
         duck.setImage(combined);
         duck.setFitWidth(DUCK_WIDTH);
         duck.setPreserveRatio(true);
+        return combined;
     }
 
 
     private void skinSubMenuItems(Menu skinSubMenu) {
-        List<String> skins = foreachFileList();
+        List<String> skins = foreachFileList("src/main/resources/assets/skins");
         for (String s : skins) {
             String skinName = s.replace("duck_", "").replace(".png", "").replace("_", " ");
             MenuItem mi = new MenuItem(skinName);
@@ -394,8 +387,8 @@ public class DuckOverlay {
         }
     }
 
-    private List <String> foreachFileList() {
-        Path folder = Paths.get("src/main/resources/assets/skins");   // your folder path
+    private List <String> foreachFileList(String folderPath) {
+        Path folder = Paths.get(folderPath);   // your folder path
         List<String> fileNames = new ArrayList<>();
 
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder)) {
@@ -420,9 +413,6 @@ public class DuckOverlay {
             Clipboard.getSystemClipboard().setContent(content);
         });
 
-        MenuItem changeToSplitSkin = new MenuItem("Change to split skin");
-        changeToSplitSkin.setOnAction(e -> {imagetest();});
-
         MenuItem toggleTop = new MenuItem("Toggle always-on-top");
         toggleTop.setOnAction(e -> stage.setAlwaysOnTop(!stage.isAlwaysOnTop()));
 
@@ -437,9 +427,6 @@ public class DuckOverlay {
                 }
         );
 
-        Menu skinSubMenu = new Menu("Skins");
-        skinSubMenuItems(skinSubMenu);
-
         MenuItem skinPopup = new MenuItem("skinPopup");
         skinPopup.setOnAction(e -> {
             showSkinPopup(stage, stage.getX() + 50, stage.getY() + 50);
@@ -447,9 +434,7 @@ public class DuckOverlay {
 
 
         ContextMenu cm = new ContextMenu(
-                changeToSplitSkin,
                 skinPopup,
-                skinSubMenu,
                 copyCount,
                 toggleTop,
                 snapBR,
@@ -494,7 +479,6 @@ public class DuckOverlay {
         """;
 
         String style = duckyStyle;
-//        tile.setStyle(style);
 
 
         VBox box = new VBox();
@@ -507,32 +491,10 @@ public class DuckOverlay {
         box.getChildren().add(title);
 
 
-        List<String> skins = foreachFileList(); // supply your own list of file names
-        for (String s : skins) {
-            Image img = new Image(getClass().getResourceAsStream("/assets/skins/" + s),
-                    64, 64, true, true);
-            ImageView iv = new ImageView(img);
-            Label label = new Label(s.replace("duck_", "").replace(".png", ""));
-            label.setAlignment(Pos.CENTER);
 
-            VBox vbox = new VBox(iv, label);
-            vbox.setAlignment(Pos.CENTER);
-            StackPane cell = new StackPane(vbox);
-            cell.setPadding(new Insets(4));
-            cell.setStyle("-fx-background-color: transparent;");
-            cell.setOnMouseEntered(e ->
-                    cell.setStyle("-fx-background-color: rgba(0,0,0,0.1); -fx-background-radius: 6;")
-            );
-            cell.setOnMouseExited(e -> cell.setStyle("-fx-background-color: transparent;"));
 
-            cell.setOnMouseClicked(e -> {
-                skin = "/assets/skins/" + s;
-                imageSwitcher();        // your method to change the image
-                popup.hide();
-            });
 
-            tile.getChildren().add(cell);
-        }
+
         StackPane styleDemo = new StackPane(new Label("Style demo"));
         styleDemo.setPrefSize(100, 50);
         styleDemo.setOnMouseEntered(e ->
@@ -550,7 +512,6 @@ public class DuckOverlay {
         });
         tile.getChildren().add(styleDemo);
 
-//        popup.getContent().add(tile);
         VBox root = new VBox(10, box, tile);
         root.setPadding(new Insets(10));
         root.setStyle(style);
@@ -558,7 +519,76 @@ public class DuckOverlay {
         popup.getContent().clear();
         popup.getContent().add(root);
 
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(10));
+        content.setStyle("-fx-background-color: white;");
+
+// add header+tile for ducks
+        loadSkins("src/main/resources/assets/skin_parts/ducks", popup, content);
+
+// add header+tile for waters
+        loadSkins("src/main/resources/assets/skin_parts/waters", popup, content);
+
+        popup.getContent().setAll(content);
+
         popup.show(owner, x+200, y-150);
 
     }
+
+    private void loadSkins(String folder, Popup popup, VBox parentBox) {
+        String section = Path.of(folder).getFileName().toString(); // "ducks" or "waters"
+        Label header = new Label(section.substring(0,1).toUpperCase() + section.substring(1));
+        header.setMaxWidth(Double.MAX_VALUE);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setStyle("""
+        -fx-font-size:16px;
+        -fx-font-weight:bold;
+        -fx-padding:8 0 4 0;
+        -fx-background-color:#eeeeee;
+        -fx-border-color:#cccccc;
+        -fx-border-width:0 0 1 0;
+    """);
+
+        TilePane tile = new TilePane();
+        tile.setPrefColumns(5);
+        tile.setHgap(10);
+        tile.setVgap(10);
+        tile.setPadding(new Insets(0,0,10,0));
+
+        for (String s : foreachFileList(folder)) {
+            Path file = Paths.get(folder, s);
+            Image img = new Image(file.toUri().toString(), 64, 64, true, true);
+
+            ImageView iv = new ImageView(img);
+            Label label = new Label(s.replaceFirst("^(duck_|water_)", "").replace(".png", ""));
+            label.setAlignment(Pos.CENTER);
+
+            VBox vbox = new VBox(iv, label);
+            vbox.setAlignment(Pos.CENTER);
+            StackPane cell = new StackPane(vbox);
+            cell.setPadding(new Insets(4));
+            cell.setStyle("-fx-background-color: transparent;");
+            cell.setOnMouseEntered(e -> cell.setStyle("-fx-background-color: rgba(0,0,0,0.1); -fx-background-radius: 6;"));
+            cell.setOnMouseExited(e -> cell.setStyle("-fx-background-color: transparent;"));
+
+            cell.setOnMouseClicked(e -> {
+                if (section.equals("ducks")) {
+                    duckSkin = "/assets/skin_parts/ducks/" + s;
+                } else if (section.equals("waters")) {
+                    waterSkin = "/assets/skin_parts/waters/" + s;
+                }
+                imageSwitcher();
+                popup.hide();
+            });
+
+            tile.getChildren().add(cell);
+        }
+
+        parentBox.getChildren().addAll(header, tile);
+    }
+
 }
+
+
+
+
