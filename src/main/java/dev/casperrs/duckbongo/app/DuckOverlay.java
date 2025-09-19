@@ -10,10 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
+import java.util.*;
 
 
 import javafx.application.Platform;
@@ -364,27 +361,6 @@ public class DuckOverlay {
         duck.setFitWidth(DUCK_WIDTH);
         duck.setPreserveRatio(true);
         return combined;
-    }
-
-
-    private void skinSubMenuItems(Menu skinSubMenu) {
-        List<String> skins = foreachFileList("src/main/resources/assets/skins");
-        for (String s : skins) {
-            String skinName = s.replace("duck_", "").replace(".png", "").replace("_", " ");
-            MenuItem mi = new MenuItem(skinName);
-
-            Image preview = new Image(
-                    getClass().getResourceAsStream("/assets/skins/" + s), 32, 32, true, true);
-
-            ImageView icon = new ImageView(preview);
-            mi.setGraphic(icon);
-
-            mi.setOnAction(e -> {
-                this.skin = "/assets/skins/" + s;
-                imageSwitcher();
-            });
-            skinSubMenu.getItems().add(mi);
-        }
     }
 
     private List <String> foreachFileList(String folderPath) {
