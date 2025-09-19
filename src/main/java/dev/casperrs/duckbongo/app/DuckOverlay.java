@@ -16,12 +16,14 @@ import java.util.Locale;
 import java.util.Objects;
 
 
+import javafx.application.Platform;
 import javafx.scene.SnapshotParameters;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.*;
+import javafx.scene.text.Text;
 import javafx.stage.Popup;
 import javafx.util.Duration;
 
@@ -428,7 +430,12 @@ public class DuckOverlay {
         snapBR.setOnAction(e -> snapBottomRight());
 
         MenuItem exit = new MenuItem("Exit");
-        exit.setOnAction(e -> stage.close());
+        exit.setOnAction(e -> {
+                    stage.close();
+                    Platform.exit();
+                    System.exit(0);
+                }
+        );
 
         Menu skinSubMenu = new Menu("Skins");
         skinSubMenuItems(skinSubMenu);
@@ -487,9 +494,17 @@ public class DuckOverlay {
         """;
 
         String style = duckyStyle;
-        tile.setStyle(style);
+//        tile.setStyle(style);
 
 
+        VBox box = new VBox();
+        box.setPadding(new Insets(10));
+        box.setStyle("-fx-background-color: white; -fx-border-color: black;");
+
+        Text title = new Text("Choose your duck skin");
+        title.setStyle("-fx-font-size:16px;-fx-font-weight:bold;");
+
+        box.getChildren().add(title);
 
 
         List<String> skins = foreachFileList(); // supply your own list of file names
@@ -535,7 +550,15 @@ public class DuckOverlay {
         });
         tile.getChildren().add(styleDemo);
 
-        popup.getContent().add(tile);
+//        popup.getContent().add(tile);
+        VBox root = new VBox(10, box, tile);
+        root.setPadding(new Insets(10));
+        root.setStyle(style);
+
+        popup.getContent().clear();
+        popup.getContent().add(root);
+
         popup.show(owner, x+200, y-150);
+
     }
 }
