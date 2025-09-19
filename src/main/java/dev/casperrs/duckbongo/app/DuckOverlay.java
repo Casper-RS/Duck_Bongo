@@ -529,6 +529,7 @@ public class DuckOverlay {
 // add header+tile for waters
         loadSkins("src/main/resources/assets/skin_parts/waters", popup, content);
 
+        content.setStyle(duckyStyle);
         popup.getContent().setAll(content);
 
         popup.show(owner, x+200, y-150);
@@ -548,7 +549,6 @@ public class DuckOverlay {
         -fx-border-color:#cccccc;
         -fx-border-width:0 0 1 0;
     """);
-
         TilePane tile = new TilePane();
         tile.setPrefColumns(5);
         tile.setHgap(10);
