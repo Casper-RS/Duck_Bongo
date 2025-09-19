@@ -343,7 +343,7 @@ public class DuckOverlay {
                 getClass().getResource("/assets/skin_parts/duckPart_water.png")
         );
         URL u2 = Objects.requireNonNull(
-                getClass().getResource("/assets/skin_parts/duckPart_duck.png")
+                getClass().getResource("/assets/skin_parts/my-image.png")
         );
 
         // force synchronous load
