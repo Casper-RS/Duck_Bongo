@@ -11,6 +11,7 @@ import java.time.Instant;
 public class ActivityExample {
 
     private static Core core; // static so MainApp can update activity
+    private static Instant startTime; // store original start time
 
     /**
      * Starts the Discord Core and sets an initial activity.
@@ -21,12 +22,13 @@ public class ActivityExample {
             params.setFlags(CreateParams.getDefaultFlags());
 
             core = new Core(params);
+            startTime = Instant.now();
 
             // Initial activity
             try (Activity activity = new Activity()) {
                 activity.setDetails("bongin ducks");
                 activity.setState("and having fun");
-                activity.timestamps().setStart(Instant.now());
+                activity.timestamps().setStart(startTime);
                 activity.assets().setLargeImage("test");
                 activity.party().setID("Party!");
                 activity.secrets().setJoinSecret("Join!");
@@ -55,7 +57,7 @@ public class ActivityExample {
             try (Activity activity = new Activity()) {
                 activity.setDetails(details);
                 activity.setState(state);
-                activity.timestamps().setStart(Instant.now());
+                activity.timestamps().setStart(startTime); // reuse original start
                 core.activityManager().updateActivity(activity);
             }
         }
