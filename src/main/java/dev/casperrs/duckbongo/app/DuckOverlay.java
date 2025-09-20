@@ -1,5 +1,6 @@
 // dev/casperrs/duckbongo/app/DuckOverlay.java
 package dev.casperrs.duckbongo.app;
+import dev.casperrs.duckbongo.ActivityExample;
 import dev.casperrs.duckbongo.core.PointsManager;
 
 import java.io.IOException;
@@ -165,6 +166,9 @@ public class DuckOverlay {
         );
         breadSpawner.setCycleCount(Animation.INDEFINITE);
         breadSpawner.play();
+
+//        ActivityExample activityExample = new ActivityExample();
+//        activityExample.discord();
     }
 
     private void spawnBread() {
@@ -335,7 +339,6 @@ public class DuckOverlay {
     private Image imageSwitcher() {
         URL duckURL = Objects.requireNonNull(getClass().getResource(duckSkin));
         URL waterURL = Objects.requireNonNull(getClass().getResource(waterSkin));
-
         Image duckImg  = new Image(duckURL.toExternalForm(), 0, 0, true, true, false);
         Image waterImg = new Image(waterURL.toExternalForm(), 0, 0, true, true, false);
 

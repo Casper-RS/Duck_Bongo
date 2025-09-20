@@ -2,12 +2,15 @@
 package dev.casperrs.duckbongo.app;
 
 import com.github.kwhat.jnativehook.NativeHookException;
+import dev.casperrs.duckbongo.ActivityExample;
 import dev.casperrs.duckbongo.core.PointsManager;
 import dev.casperrs.duckbongo.input.InputHook;
 import dev.casperrs.duckbongo.dataHandler.DataHandler;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.stage.Stage;
+
+import java.io.IOException;
 
 public class MainApp extends Application {
     private DuckOverlay overlay;
@@ -17,6 +20,7 @@ public class MainApp extends Application {
     DataHandler dataHandler = new DataHandler(points);
     @Override
     public void start(Stage stage) {
+        stage.setTitle("Duck Bongo");
         dataHandler = new DataHandler(points);
         dataHandler.initAndLoad();
 
@@ -25,6 +29,14 @@ public class MainApp extends Application {
         // Global input hooks
         InputHook hook = new InputHook(points);
         try { hook.start(); } catch (NativeHookException e) { e.printStackTrace(); }
+
+        new Thread(() -> {
+            try {
+                ActivityExample.main(new String[0]);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }, "Discord-RPC").start();
 
         // Update only when points change (for punch + counter text)
         new AnimationTimer() {
@@ -45,7 +57,7 @@ public class MainApp extends Application {
         }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         launch(args);
     }
 }
