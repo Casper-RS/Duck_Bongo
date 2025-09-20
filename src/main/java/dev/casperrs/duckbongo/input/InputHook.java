@@ -4,6 +4,7 @@ import com.github.kwhat.jnativehook.GlobalScreen;
 import com.github.kwhat.jnativehook.NativeHookException;
 import com.github.kwhat.jnativehook.keyboard.*;
 import com.github.kwhat.jnativehook.mouse.*;
+import dev.casperrs.duckbongo.ActivityUpdater;
 import dev.casperrs.duckbongo.core.PointsManager;
 
 import java.util.HashSet;
@@ -13,8 +14,12 @@ import java.util.Set;
 
 public class InputHook implements NativeKeyListener, NativeMouseInputListener {
     private final PointsManager points;
+    private final ActivityUpdater activityUpdater;
 
-    public InputHook(PointsManager points) { this.points = points; }
+    public InputHook(PointsManager points, ActivityUpdater activityUpdater) {
+        this.points = points;
+        this.activityUpdater = activityUpdater;
+    }
 
     public void start() throws NativeHookException {
         // Dempen van JNativeHook logging
@@ -36,13 +41,24 @@ public class InputHook implements NativeKeyListener, NativeMouseInputListener {
     @Override public void nativeKeyPressed(NativeKeyEvent e) {
         if (!pressedKeys.contains(e.getKeyCode())) {
             points.add(1);
+
+            if (activityUpdater != null) {
+                activityUpdater.update("Clicks: " + points.get(), "Pressing keys!");
+            }
+
             pressedKeys.add(e.getKeyCode());
         }
     }
     @Override public void nativeKeyReleased(NativeKeyEvent e) {
         pressedKeys.remove(e.getKeyCode());
     }
-    @Override public void nativeMousePressed(NativeMouseEvent e) { points.add(1); }
+    @Override public void nativeMousePressed(NativeMouseEvent e) {
+        points.add(1);
+
+        if (activityUpdater != null) {
+            activityUpdater.update("CLicks: " + points.get(), "Clicking!");
+        }
+    }
     @Override public void nativeMouseDragged(NativeMouseEvent e) { /* eventueel throttle */ }
     @Override public void nativeMouseMoved(NativeMouseEvent e) { /* ignore */ }
 }

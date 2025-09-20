@@ -3,65 +3,62 @@ package dev.casperrs.duckbongo;
 import de.jcm.discordgamesdk.Core;
 import de.jcm.discordgamesdk.CreateParams;
 import de.jcm.discordgamesdk.activity.Activity;
+import dev.casperrs.duckbongo.core.PointsManager;
 
-import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 
-/**
- * Example how to set a custom activity.
- */
-public class ActivityExample
-{
-    public static void main(String[] args) throws IOException
-    {
-        // Set parameters for the Core
-        try(CreateParams params = new CreateParams())
-        {
-            params.setClientID(1418931416724406292L);
+public class ActivityExample {
+
+    private static Core core; // static so MainApp can update activity
+
+    /**
+     * Starts the Discord Core and sets an initial activity.
+     */
+    public static void runActivityHook(PointsManager points) throws IOException {
+        try (CreateParams params = new CreateParams()) {
+            params.setClientID(1418931416724406292L); // replace with your client ID
             params.setFlags(CreateParams.getDefaultFlags());
-            // Create the Core
-            try(Core core = new Core(params))
-            {
-                // Create the Activity
-                try(Activity activity = new Activity())
-                {
-                    activity.setDetails("bongin ducks");
-                    activity.setState("and having fun");
 
-                    // Setting a start time causes an "elapsed" field to appear
-                    activity.timestamps().setStart(Instant.now());
+            core = new Core(params);
 
-                    // We are in a party with 10 out of 100 people.
-//                    activity.party().size().setMaxSize(100);
-//                    activity.party().size().setCurrentSize(10);
+            // Initial activity
+            try (Activity activity = new Activity()) {
+                activity.setDetails("bongin ducks");
+                activity.setState("and having fun");
+                activity.timestamps().setStart(Instant.now());
+                activity.assets().setLargeImage("test");
+                activity.party().setID("Party!");
+                activity.secrets().setJoinSecret("Join!");
+                core.activityManager().updateActivity(activity);
+            }
 
-                    // Make a "cool" image show up
-                    activity.assets().setLargeImage("test");
-
-                    // Setting a join secret and a party ID causes an "Ask to Join" button to appear
-                    activity.party().setID("Party!");
-                    activity.secrets().setJoinSecret("Join!");
-
-                    // Finally, update the current activity to our activity
-                    core.activityManager().updateActivity(activity);
-                }
-
-                // Run callbacks forever
-                while(true)
-                {
+            // Run the callbacks loop forever
+            new Thread(() -> {
+                while (true) {
                     core.runCallbacks();
-                    try
-                    {
-                        // Sleep a bit to save CPU
+                    try {
                         Thread.sleep(16);
-                    }
-                    catch(InterruptedException e)
-                    {
+                    } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                 }
+            }, "Discord-RPC-Callbacks").start();
+        }
+    }
+
+    /**
+     * Static helper for updating the activity from elsewhere (e.g., MainApp).
+     */
+    public static void updateActivity(String details, String state) {
+        if (core != null) {
+            try (Activity activity = new Activity()) {
+                activity.setDetails(details);
+                activity.setState(state);
+                activity.timestamps().setStart(Instant.now());
+                core.activityManager().updateActivity(activity);
             }
         }
     }
 }
+

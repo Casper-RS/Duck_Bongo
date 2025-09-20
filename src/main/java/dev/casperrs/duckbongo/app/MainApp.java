@@ -1,63 +1,79 @@
-// dev/casperrs/duckbongo/app/MainApp.java
 package dev.casperrs.duckbongo.app;
 
 import com.github.kwhat.jnativehook.NativeHookException;
+import de.jcm.discordgamesdk.activity.Activity;
 import dev.casperrs.duckbongo.ActivityExample;
+import dev.casperrs.duckbongo.ActivityUpdater;
 import dev.casperrs.duckbongo.core.PointsManager;
-import dev.casperrs.duckbongo.input.InputHook;
 import dev.casperrs.duckbongo.dataHandler.DataHandler;
+import dev.casperrs.duckbongo.input.InputHook;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.stage.Stage;
 
-import java.io.IOException;
+import java.time.Instant;
 
 public class MainApp extends Application {
     private DuckOverlay overlay;
     private long lastPointsSeen = 0;
 
-    PointsManager points = new PointsManager();
-    DataHandler dataHandler = new DataHandler(points);
+    private final PointsManager points = new PointsManager();
+    private DataHandler dataHandler = new DataHandler(points);
+
     @Override
     public void start(Stage stage) {
         stage.setTitle("Duck Bongo");
-        dataHandler = new DataHandler(points);
+
+        // Load saved points
         dataHandler.initAndLoad();
 
+        // Setup overlay
         overlay = new DuckOverlay(stage, points);
         overlay.show();
-        // Global input hooks
-        InputHook hook = new InputHook(points);
-        try { hook.start(); } catch (NativeHookException e) { e.printStackTrace(); }
 
+        // ActivityUpdater: updates Discord activity
+        ActivityUpdater updater = (details, state) -> {
+            ActivityExample.updateActivity(details, state);
+        };
+
+        // Start input hooks
+        try {
+            InputHook hook = new InputHook(points, updater);
+            hook.start();
+        } catch (NativeHookException e) {
+            e.printStackTrace();
+        }
+
+        // Start Discord RPC in a separate thread (creates core + initial activity)
         new Thread(() -> {
             try {
-                ActivityExample.main(new String[0]);
-            } catch (IOException e) {
+                ActivityExample.runActivityHook(points);
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }, "Discord-RPC").start();
 
-        // Update only when points change (for punch + counter text)
+        // Update overlay only when points change
         new AnimationTimer() {
             @Override
             public void handle(long now) {
-                long p = points.get();
-                if (p != lastPointsSeen) {
-                    overlay.punch();          // also updates the counter text
-                    lastPointsSeen = p;
+                long currentPoints = points.get();
+                if (currentPoints != lastPointsSeen) {
+                    overlay.punch(); // animates duck + updates counter
+                    lastPointsSeen = currentPoints;
                 }
             }
         }.start();
     }
 
+    @Override
     public void stop() {
         if (dataHandler != null) {
             dataHandler.save();
         }
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         launch(args);
     }
 }
