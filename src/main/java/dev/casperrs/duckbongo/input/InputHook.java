@@ -43,7 +43,7 @@ public class InputHook implements NativeKeyListener, NativeMouseInputListener {
             points.add(1);
 
             if (activityUpdater != null) {
-                activityUpdater.update("Clicks: " + points.get(), "Pressing keys!");
+                activityUpdater.update("Points: " + points.get(), "Pressing keys!");
             }
 
             pressedKeys.add(e.getKeyCode());
@@ -56,7 +56,7 @@ public class InputHook implements NativeKeyListener, NativeMouseInputListener {
         points.add(1);
 
         if (activityUpdater != null) {
-            activityUpdater.update("CLicks: " + points.get(), "Clicking!");
+            activityUpdater.update("Points: " + points.get(), "Clicking!");
         }
     }
     @Override public void nativeMouseDragged(NativeMouseEvent e) { /* eventueel throttle */ }
