@@ -292,19 +292,14 @@ package dev.casperrs.duckbongo.app;
 
 import dev.casperrs.duckbongo.core.PointsManager;
 import dev.casperrs.duckbongo.dataHandler.DataHandler;
+import dev.casperrs.duckbongo.network.DuckPeer;
 import dev.casperrs.duckbongo.network.DuckState;
-import dev.casperrs.duckbongo.network.WorldState;
 
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
-import javafx.application.Platform;
 import javafx.stage.Stage;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryonet.Client;
-import com.esotericsoftware.kryonet.Connection;
-import com.esotericsoftware.kryonet.Listener;
-
+import java.io.IOException;
 import java.util.HashMap;
 
 public class MainApp extends Application {
@@ -313,16 +308,37 @@ public class MainApp extends Application {
     private long lastPointsSeen = 0;
     private final PointsManager points = new PointsManager();
     private final DataHandler dataHandler = new DataHandler(points);
+    private DuckPeer peer;
 
     @Override
     public void start(Stage stage) {
         overlay = new DuckOverlay(stage, points);
 
-        startNetworking();
+        // Add the LAN IPs of all other players here (leave empty if none yet)
+        String[] peerIPs = {"192.168.1.10", "192.168.1.11"};
+        int port = 54555;
 
+        try {
+            peer = new DuckPeer(port, peerIPs, port);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // Main update loop
         new AnimationTimer() {
             @Override
             public void handle(long now) {
+                // Send own duck to peers
+                DuckState me = new DuckState();
+                me.x = overlay.getDuckX();
+                me.y = overlay.getDuckY();
+                me.skin = overlay.getDuckSkin();
+                peer.sendMyDuck(me);
+
+                // Update overlay with all connected ducks
+                overlay.updateWorld(new HashMap<>(peer.getWorld()));
+
+                // Update points animation
                 long currentPoints = points.get();
                 if (currentPoints != lastPointsSeen) {
                     overlay.punch();
@@ -330,44 +346,6 @@ public class MainApp extends Application {
                 }
             }
         }.start();
-    }
-
-    private void startNetworking() {
-        new Thread(() -> {
-            try {
-                Client client = new Client();
-                client.start();
-
-                client.connect(5000, "localhost", 54555, 54777); // replace with server IP for other devices
-
-                Kryo kryo = client.getKryo();
-                kryo.register(DuckState.class);
-                kryo.register(WorldState.class);
-                kryo.register(HashMap.class);
-
-                client.addListener(new Listener() {
-                    @Override
-                    public void received(Connection c, Object obj) {
-                        if (obj instanceof WorldState ws) {
-                            Platform.runLater(() -> overlay.updateWorld(ws.ducks));
-                        }
-                    }
-                });
-
-                while (true) {
-                    DuckState me = new DuckState();
-                    me.x = overlay.getDuckX();
-                    me.y = overlay.getDuckY();
-                    me.skin = overlay.getDuckSkin();
-                    client.sendTCP(me);
-
-                    Thread.sleep(50);
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
     }
 
     @Override
@@ -379,4 +357,3 @@ public class MainApp extends Application {
         launch(args);
     }
 }
-
