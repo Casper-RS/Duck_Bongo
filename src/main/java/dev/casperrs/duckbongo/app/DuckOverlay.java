@@ -621,7 +621,7 @@
 ////
 ////
 //
-//
+
 //package dev.casperrs.duckbongo.app;
 //
 //import dev.casperrs.duckbongo.core.PointsManager;
@@ -787,12 +787,15 @@ import java.util.Objects;
 
 public class DuckOverlay {
     private static final int DUCK_WIDTH = 140;
+    private static final int BAR_WIDTH = 100;
+    private static final int BAR_HEIGHT = 22;
 
     private final PointsManager points;
     private final Stage stage;
 
     private ImageView duck;
     private final ImageView breadIcon;
+    private final StackPane counterBar;
     private final Label counterText;
 
     private String duckSkin = "/assets/skin_parts/ducks/duck_default.png";
@@ -805,42 +808,48 @@ public class DuckOverlay {
         this.stage = stage;
         this.points = points;
 
-        // Duck ImageView
+        // Duck + bread
         duck = new ImageView();
         imageSwitcher();
-
-        // Bread icon
         Image bread = new Image(Objects.requireNonNull(getClass().getResource("/assets/Bread.png")).toExternalForm(), 32, 32, true, true);
         breadIcon = new ImageView(bread);
         breadIcon.setVisible(false);
 
-        // Counter
+        StackPane duckWithBread = new StackPane(duck, breadIcon);
+        duckWithBread.setAlignment(Pos.CENTER_LEFT);
+
+        // Counter bar
         counterText = new Label(format(points.get()));
         counterText.setStyle("-fx-text-fill:#1f2428;-fx-font-size:12px;-fx-font-weight:bold;");
 
-        StackPane duckWithBread = new StackPane(duck, breadIcon);
-        duckWithBread.setPrefSize(DUCK_WIDTH, duck.getImage().getHeight());
+        Region bg = new Region();
+        bg.setPrefSize(BAR_WIDTH, BAR_HEIGHT);
+        bg.setStyle("-fx-background-color:#bad1e8; -fx-background-radius:8; -fx-border-color:#3a4147; -fx-border-width:1;");
 
-        VBox rootBox = new VBox(duckWithBread, counterText);
-        rootBox.setSpacing(5);
-        rootBox.setAlignment(Pos.TOP_LEFT);
-        rootBox.setPadding(new Insets(5));
+        counterBar = new StackPane(bg, counterText);
+        StackPane.setAlignment(counterText, Pos.CENTER);
 
-        Group root = new Group(rootBox);
-        Scene scene = new Scene(root, DUCK_WIDTH + 20, duck.getImage().getHeight() + 60);
+        HBox barRow = new HBox(6, counterBar);
+        barRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox column = new VBox(0, duckWithBread, barRow);
+        column.setPadding(new Insets(4));
+        column.setAlignment(Pos.TOP_LEFT);
+
+        Group root = new Group(column);
+        Scene scene = new Scene(root, DUCK_WIDTH + 20, duck.getImage().getHeight() + BAR_HEIGHT + 20);
         scene.setFill(null);
 
         stage.initStyle(StageStyle.TRANSPARENT);
         stage.setAlwaysOnTop(true);
         stage.setScene(scene);
 
-        // Initial position bottom-right
+        // Bottom-right start
         Rectangle2D vb = Screen.getPrimary().getVisualBounds();
         stage.setX(vb.getMaxX() - scene.getWidth() - 20);
         stage.setY(vb.getMaxY() - scene.getHeight() - 20);
 
         enableWindowDrag(scene);
-
         stage.show();
     }
 
