@@ -312,33 +312,37 @@ public class MainApp extends Application {
 
     @Override
     public void start(Stage stage) {
+        // Setup overlay
         overlay = new DuckOverlay(stage, points);
 
-        // Add the LAN IPs of all other players here (leave empty if none yet)
-        String[] peerIPs = {"192.168.1.10", "192.168.1.11"};
+        // Add the LAN IPs of all other players
+        String[] peerIPs = {""}; // replace/add all peers
         int port = 54555;
 
         try {
             peer = new DuckPeer(port, peerIPs, port);
         } catch (IOException e) {
             e.printStackTrace();
+            System.out.println("Failed to start DuckPeer");
+            return;
         }
 
         // Main update loop
         new AnimationTimer() {
             @Override
             public void handle(long now) {
-                // Send own duck to peers
+                // 1️⃣ Update own duck state
                 DuckState me = new DuckState();
                 me.x = overlay.getDuckX();
                 me.y = overlay.getDuckY();
                 me.skin = overlay.getDuckSkin();
                 peer.sendMyDuck(me);
 
-                // Update overlay with all connected ducks
-                overlay.updateWorld(new HashMap<>(peer.getWorld()));
+                // 2️⃣ Update overlay with all ducks from peers
+                HashMap<Integer, DuckState> worldCopy = peer.getWorld();
+                overlay.updateWorld(worldCopy);
 
-                // Update points animation
+                // 3️⃣ Update points animation if changed
                 long currentPoints = points.get();
                 if (currentPoints != lastPointsSeen) {
                     overlay.punch();
@@ -351,9 +355,11 @@ public class MainApp extends Application {
     @Override
     public void stop() {
         if (dataHandler != null) dataHandler.save();
+        if (peer != null) peer.stop();
     }
 
     public static void main(String[] args) {
         launch(args);
     }
 }
+

@@ -1,7 +1,6 @@
 package dev.casperrs.duckbongo.network;
 
 import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryonet.Client;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
@@ -11,75 +10,69 @@ import java.util.HashMap;
 
 public class DuckPeer {
 
-    private final HashMap<Integer, DuckState> ducks = new HashMap<>();
     private final Server server;
-    private final Client client;
+    private final HashMap<Integer, DuckState> world = new HashMap<>();
 
-    public DuckPeer(int serverPort, String[] peerIPs, int peerPort) throws IOException {
+    public DuckPeer(int port, String[] peerIPs, int peerPort) throws IOException {
         server = new Server();
-        client = new Client();
+        server.start();
 
-        Kryo serverKryo = server.getKryo();
-        Kryo clientKryo = client.getKryo();
-        serverKryo.register(DuckState.class);
-        serverKryo.register(WorldState.class);
-        serverKryo.register(HashMap.class);
-        clientKryo.register(DuckState.class);
-        clientKryo.register(WorldState.class);
-        clientKryo.register(HashMap.class);
+        Kryo kryo = server.getKryo();
+        kryo.register(DuckState.class);
+        kryo.register(HashMap.class);
 
-        // Server listener
         server.addListener(new Listener() {
             @Override
             public void received(Connection c, Object obj) {
                 if (obj instanceof DuckState state) {
-                    ducks.put(c.getID(), state);
-                    server.sendToAllTCP(new WorldState(new HashMap<>(ducks)));
+                    synchronized (world) {
+                        world.put(c.getID(), state);
+                    }
                 }
             }
 
             @Override
             public void disconnected(Connection c) {
-                ducks.remove(c.getID());
-                server.sendToAllTCP(new WorldState(new HashMap<>(ducks)));
-            }
-        });
-
-        server.bind(serverPort);
-        server.start();
-
-        client.start();
-        if (peerIPs != null) {
-            for (String ip : peerIPs) {
-                if (ip != null && !ip.isEmpty()) client.connect(5000, ip, peerPort);
-            }
-        }
-
-        client.addListener(new Listener() {
-            @Override
-            public void received(Connection c, Object obj) {
-                if (obj instanceof WorldState ws) {
-                    synchronized (ducks) {
-                        ducks.clear();
-                        ducks.putAll(ws.ducks);
-                    }
+                synchronized (world) {
+                    world.remove(c.getID());
                 }
             }
         });
+
+        server.bind(port);
+
+        // Connect to other peers
+        for (String ip : peerIPs) {
+            try {
+                com.esotericsoftware.kryonet.Client client = new com.esotericsoftware.kryonet.Client();
+                client.start();
+                Kryo clientKryo = client.getKryo();
+                clientKryo.register(DuckState.class);
+                clientKryo.register(HashMap.class);
+                client.connect(5000, ip, peerPort);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        System.out.println("DuckPeer running on port " + port);
     }
 
-    // Send your duck to other peers
-    public void sendMyDuck(DuckState me) {
-        client.sendTCP(me);
-        synchronized (ducks) {
-            ducks.put(-1, me); // optional: store own duck with key -1
+    // Send your own duck state to all connected clients
+    public void sendMyDuck(DuckState state) {
+        for (Connection c : server.getConnections()) {
+            c.sendTCP(state);
         }
     }
 
-    // <-- THIS IS THE METHOD YOU NEED -->
+    // Return a copy of the world map for safe iteration
     public HashMap<Integer, DuckState> getWorld() {
-        synchronized (ducks) {
-            return new HashMap<>(ducks);
+        synchronized (world) {
+            return new HashMap<>(world);
         }
+    }
+
+    public void stop() {
+        server.stop();
     }
 }
