@@ -759,12 +759,205 @@
 //    }
 //}
 
+//package dev.casperrs.duckbongo.app;
+//
+//import dev.casperrs.duckbongo.core.PointsManager;
+//import dev.casperrs.duckbongo.network.DuckState;
+//import javafx.animation.FadeTransition;
+//import javafx.animation.ScaleTransition;
+//import javafx.geometry.Insets;
+//import javafx.geometry.Pos;
+//import javafx.geometry.Rectangle2D;
+//import javafx.scene.Group;
+//import javafx.scene.Scene;
+//import javafx.scene.canvas.Canvas;
+//import javafx.scene.canvas.GraphicsContext;
+//import javafx.scene.control.Label;
+//import javafx.scene.image.Image;
+//import javafx.scene.image.ImageView;
+//import javafx.scene.layout.*;
+//import javafx.stage.Screen;
+//import javafx.stage.Stage;
+//import javafx.stage.StageStyle;
+//import javafx.util.Duration;
+//import javafx.application.Platform;
+//
+//import java.util.HashMap;
+//import java.util.Objects;
+//
+//public class DuckOverlay {
+//    private static final int DUCK_WIDTH = 140;
+//    private static final int BAR_WIDTH = 100;
+//    private static final int BAR_HEIGHT = 22;
+//
+//    private final PointsManager points;
+//    private final Stage stage;
+//
+//    private ImageView duck;
+//    private final ImageView breadIcon;
+//    private final StackPane counterBar;
+//    private final Label counterText;
+//
+//    private String duckSkin = "/assets/skin_parts/ducks/duck_default.png";
+//    private String waterSkin = "/assets/skin_parts/waters/water_default.png";
+//
+//    // Multiplayer ducks
+//    private final HashMap<Integer, ImageView> otherDucks = new HashMap<>();
+//
+//    public DuckOverlay(Stage stage, PointsManager points) {
+//        this.stage = stage;
+//        this.points = points;
+//
+//        // Duck + bread
+//        duck = new ImageView();
+//        imageSwitcher();
+//        Image bread = new Image(Objects.requireNonNull(getClass().getResource("/assets/Bread.png")).toExternalForm(), 32, 32, true, true);
+//        breadIcon = new ImageView(bread);
+//        breadIcon.setVisible(false);
+//
+//        StackPane duckWithBread = new StackPane(duck, breadIcon);
+//        duckWithBread.setAlignment(Pos.CENTER_LEFT);
+//
+//        // Counter bar
+//        counterText = new Label(format(points.get()));
+//        counterText.setStyle("-fx-text-fill:#1f2428;-fx-font-size:12px;-fx-font-weight:bold;");
+//
+//        Region bg = new Region();
+//        bg.setPrefSize(BAR_WIDTH, BAR_HEIGHT);
+//        bg.setStyle("-fx-background-color:#bad1e8; -fx-background-radius:8; -fx-border-color:#3a4147; -fx-border-width:1;");
+//
+//        counterBar = new StackPane(bg, counterText);
+//        StackPane.setAlignment(counterText, Pos.CENTER);
+//
+//        HBox barRow = new HBox(6, counterBar);
+//        barRow.setAlignment(Pos.CENTER_LEFT);
+//
+//        VBox column = new VBox(0, duckWithBread, barRow);
+//        column.setPadding(new Insets(4));
+//        column.setAlignment(Pos.TOP_LEFT);
+//
+//        Group root = new Group(column);
+//        Scene scene = new Scene(root, DUCK_WIDTH + 20, duck.getImage().getHeight() + BAR_HEIGHT + 20);
+//        scene.setFill(null);
+//
+//        stage.initStyle(StageStyle.TRANSPARENT);
+//        stage.setAlwaysOnTop(true);
+//        stage.setScene(scene);
+//
+//        // Bottom-right start
+//        Rectangle2D vb = Screen.getPrimary().getVisualBounds();
+//        stage.setX(vb.getMaxX() - scene.getWidth() - 20);
+//        stage.setY(vb.getMaxY() - scene.getHeight() - 20);
+//
+//        enableWindowDrag(scene);
+//        stage.show();
+//    }
+//
+//    // --------------------- Getters ---------------------
+//    public float getDuckX() { return (float) duck.getTranslateX(); }
+//    public float getDuckY() { return (float) duck.getTranslateY(); }
+//    public String getDuckSkin() { return duckSkin; }
+//
+//    // --------------------- Punch Animation ---------------------
+//    public void punch() {
+//        ScaleTransition st = new ScaleTransition(Duration.millis(80), duck);
+//        st.setFromX(1.0); st.setFromY(1.0);
+//        st.setToX(0.92); st.setToY(0.92);
+//        st.setAutoReverse(true);
+//        st.setCycleCount(2);
+//        st.play();
+//
+//        counterText.setText(format(points.get()));
+//    }
+//
+//    // --------------------- Bread ---------------------
+//    public void spawnBread() {
+//        breadIcon.setVisible(true);
+//        FadeTransition fade = new FadeTransition(Duration.seconds(1), breadIcon);
+//        fade.setFromValue(0);
+//        fade.setToValue(1);
+//        fade.play();
+//    }
+//
+//    // --------------------- Multiplayer ---------------------
+//    public void updateWorld(HashMap<Integer, DuckState> worldDucks) {
+//        for (var entry : worldDucks.entrySet()) {
+//            int id = entry.getKey();
+//            DuckState state = entry.getValue();
+//
+//            // Skip your own duck
+//            if (state.skin.equals(duckSkin)) continue;
+//
+//            ImageView otherDuck = otherDucks.get(id);
+//            if (otherDuck == null) {
+//                Image img = new Image(Objects.requireNonNull(getClass().getResource(state.skin)).toExternalForm(),
+//                        DUCK_WIDTH, 0, true, true);
+//                otherDuck = new ImageView(img);
+//                otherDucks.put(id, otherDuck);
+//                ((Group) stage.getScene().getRoot()).getChildren().add(otherDuck);
+//            }
+//
+//            otherDuck.setTranslateX(state.x);
+//            otherDuck.setTranslateY(state.y);
+//        }
+//
+//        // Remove disconnected ducks
+//        otherDucks.keySet().removeIf(id -> {
+//            if (!worldDucks.containsKey(id)) {
+//                ImageView iv = otherDucks.remove(id);
+//                ((Group) stage.getScene().getRoot()).getChildren().remove(iv);
+//                return true;
+//            }
+//            return false;
+//        });
+//    }
+//
+//    // --------------------- Dragging ---------------------
+//    private void enableWindowDrag(Scene scene) {
+//        final double[] dragOffsetX = {0};
+//        final double[] dragOffsetY = {0};
+//
+//        scene.setOnMousePressed(e -> {
+//            dragOffsetX[0] = e.getSceneX();
+//            dragOffsetY[0] = e.getSceneY();
+//        });
+//
+//        scene.setOnMouseDragged(e -> {
+//            stage.setX(e.getScreenX() - dragOffsetX[0]);
+//            stage.setY(e.getScreenY() - dragOffsetY[0]);
+//        });
+//    }
+//
+//    // --------------------- Image Switching ---------------------
+//    private void imageSwitcher() {
+//        Image duckImg = new Image(Objects.requireNonNull(getClass().getResource(duckSkin)).toExternalForm(), 0, 0, true, true);
+//        Image waterImg = new Image(Objects.requireNonNull(getClass().getResource(waterSkin)).toExternalForm(), 0, 0, true, true);
+//
+//        double width = Math.max(duckImg.getWidth(), waterImg.getWidth());
+//        double height = Math.max(duckImg.getHeight(), waterImg.getHeight());
+//
+//        Canvas canvas = new Canvas(width, height);
+//        GraphicsContext gc = canvas.getGraphicsContext2D();
+//        gc.clearRect(0, 0, width, height);
+//        gc.drawImage(waterImg, 0, 0);
+//        gc.drawImage(duckImg, 0, 0);
+//
+//        duck.setImage(canvas.snapshot(null, null));
+//        duck.setFitWidth(DUCK_WIDTH);
+//        duck.setPreserveRatio(true);
+//    }
+//
+//    // --------------------- Formatting ---------------------
+//    private static String format(long n) {
+//        return String.format("%,d", n);
+//    }
+//}
+
 package dev.casperrs.duckbongo.app;
 
 import dev.casperrs.duckbongo.core.PointsManager;
 import dev.casperrs.duckbongo.network.DuckState;
-import javafx.animation.FadeTransition;
-import javafx.animation.ScaleTransition;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
@@ -775,90 +968,80 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.*;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import javafx.animation.FadeTransition;
+import javafx.animation.ScaleTransition;
 import javafx.util.Duration;
-import javafx.application.Platform;
 
 import java.util.HashMap;
 import java.util.Objects;
 
 public class DuckOverlay {
+
     private static final int DUCK_WIDTH = 140;
-    private static final int BAR_WIDTH = 100;
-    private static final int BAR_HEIGHT = 22;
 
     private final PointsManager points;
     private final Stage stage;
 
     private ImageView duck;
     private final ImageView breadIcon;
-    private final StackPane counterBar;
     private final Label counterText;
 
     private String duckSkin = "/assets/skin_parts/ducks/duck_default.png";
     private String waterSkin = "/assets/skin_parts/waters/water_default.png";
 
-    // Multiplayer ducks
     private final HashMap<Integer, ImageView> otherDucks = new HashMap<>();
 
     public DuckOverlay(Stage stage, PointsManager points) {
         this.stage = stage;
         this.points = points;
 
-        // Duck + bread
+        // Duck ImageView
         duck = new ImageView();
         imageSwitcher();
+
+        // Bread icon
         Image bread = new Image(Objects.requireNonNull(getClass().getResource("/assets/Bread.png")).toExternalForm(), 32, 32, true, true);
         breadIcon = new ImageView(bread);
         breadIcon.setVisible(false);
 
-        StackPane duckWithBread = new StackPane(duck, breadIcon);
-        duckWithBread.setAlignment(Pos.CENTER_LEFT);
-
-        // Counter bar
+        // Counter
         counterText = new Label(format(points.get()));
         counterText.setStyle("-fx-text-fill:#1f2428;-fx-font-size:12px;-fx-font-weight:bold;");
 
-        Region bg = new Region();
-        bg.setPrefSize(BAR_WIDTH, BAR_HEIGHT);
-        bg.setStyle("-fx-background-color:#bad1e8; -fx-background-radius:8; -fx-border-color:#3a4147; -fx-border-width:1;");
+        StackPane duckWithBread = new StackPane(duck, breadIcon);
+        duckWithBread.setPrefSize(DUCK_WIDTH, duck.getImage().getHeight());
 
-        counterBar = new StackPane(bg, counterText);
-        StackPane.setAlignment(counterText, Pos.CENTER);
+        VBox rootBox = new VBox(duckWithBread, counterText);
+        rootBox.setSpacing(5);
+        rootBox.setAlignment(Pos.TOP_LEFT);
+        rootBox.setPadding(new Insets(5));
 
-        HBox barRow = new HBox(6, counterBar);
-        barRow.setAlignment(Pos.CENTER_LEFT);
-
-        VBox column = new VBox(0, duckWithBread, barRow);
-        column.setPadding(new Insets(4));
-        column.setAlignment(Pos.TOP_LEFT);
-
-        Group root = new Group(column);
-        Scene scene = new Scene(root, DUCK_WIDTH + 20, duck.getImage().getHeight() + BAR_HEIGHT + 20);
+        Group root = new Group(rootBox);
+        Scene scene = new Scene(root, DUCK_WIDTH + 20, duck.getImage().getHeight() + 60);
         scene.setFill(null);
 
         stage.initStyle(StageStyle.TRANSPARENT);
         stage.setAlwaysOnTop(true);
         stage.setScene(scene);
 
-        // Bottom-right start
         Rectangle2D vb = Screen.getPrimary().getVisualBounds();
         stage.setX(vb.getMaxX() - scene.getWidth() - 20);
         stage.setY(vb.getMaxY() - scene.getHeight() - 20);
 
         enableWindowDrag(scene);
+
         stage.show();
     }
 
-    // --------------------- Getters ---------------------
     public float getDuckX() { return (float) duck.getTranslateX(); }
     public float getDuckY() { return (float) duck.getTranslateY(); }
     public String getDuckSkin() { return duckSkin; }
 
-    // --------------------- Punch Animation ---------------------
     public void punch() {
         ScaleTransition st = new ScaleTransition(Duration.millis(80), duck);
         st.setFromX(1.0); st.setFromY(1.0);
@@ -870,22 +1053,12 @@ public class DuckOverlay {
         counterText.setText(format(points.get()));
     }
 
-    // --------------------- Bread ---------------------
-    public void spawnBread() {
-        breadIcon.setVisible(true);
-        FadeTransition fade = new FadeTransition(Duration.seconds(1), breadIcon);
-        fade.setFromValue(0);
-        fade.setToValue(1);
-        fade.play();
-    }
-
-    // --------------------- Multiplayer ---------------------
     public void updateWorld(HashMap<Integer, DuckState> worldDucks) {
         for (var entry : worldDucks.entrySet()) {
             int id = entry.getKey();
             DuckState state = entry.getValue();
 
-            // Skip your own duck
+            // Skip own duck
             if (state.skin.equals(duckSkin)) continue;
 
             ImageView otherDuck = otherDucks.get(id);
@@ -912,7 +1085,6 @@ public class DuckOverlay {
         });
     }
 
-    // --------------------- Dragging ---------------------
     private void enableWindowDrag(Scene scene) {
         final double[] dragOffsetX = {0};
         final double[] dragOffsetY = {0};
@@ -928,7 +1100,6 @@ public class DuckOverlay {
         });
     }
 
-    // --------------------- Image Switching ---------------------
     private void imageSwitcher() {
         Image duckImg = new Image(Objects.requireNonNull(getClass().getResource(duckSkin)).toExternalForm(), 0, 0, true, true);
         Image waterImg = new Image(Objects.requireNonNull(getClass().getResource(waterSkin)).toExternalForm(), 0, 0, true, true);
@@ -947,9 +1118,9 @@ public class DuckOverlay {
         duck.setPreserveRatio(true);
     }
 
-    // --------------------- Formatting ---------------------
     private static String format(long n) {
         return String.format("%,d", n);
     }
 }
+
 
