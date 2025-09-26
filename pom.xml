@@ -38,9 +38,17 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>dev.casperrs.duckbongo.app.MainApp</mainClass> <!-- Replace with your main class -->
+                            <mainClass>dev.casperrs.duckbongo.app.MainApp</mainClass>
                         </manifest>
                     </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>dev.casperrs.duckbongo.server.DuckServer</mainClass>
                 </configuration>
             </plugin>
             <plugin>
