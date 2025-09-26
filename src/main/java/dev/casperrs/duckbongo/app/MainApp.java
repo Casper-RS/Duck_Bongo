@@ -1,5 +1,6 @@
 package dev.casperrs.duckbongo.app;
 
+import dev.casperrs.duckbongo.app.utils.DuckEvents;
 import dev.casperrs.duckbongo.core.PointsManager;
 import dev.casperrs.duckbongo.dataHandler.DataHandler;
 import dev.casperrs.duckbongo.network.DuckState;
@@ -27,80 +28,93 @@ public class MainApp extends Application {
     private final DataHandler dataHandler = new DataHandler(points);
     private InputHook inputHook;
     private Client client;
-    private boolean connected = false;
+    private volatile boolean connected = false;
     private volatile String serverIP = "13.62.96.190";
+
+    // Optional: tiny throttle if you want to send heartbeat occasionally (ms)
+    private static final long HEARTBEAT_MS = 0; // set to 0 to disable heartbeat
+    private long lastHeartbeat = 0;
 
     @Override
     public void start(Stage stage) {
-        // Setup overlay
+        // === UI / Overlay ===
         overlay = new DuckOverlay(stage, points);
 
-        // Load persisted points and user data
+        // === Persistence ===
         dataHandler.initAndLoad();
 
-        // Start global input hook so clicks/keys add points
+        // === Input Hook (adds points) ===
         try {
-            inputHook = new InputHook(points, null); // no-op activity updater
+            inputHook = new InputHook(points, null); // no rich presence updater
             inputHook.start();
         } catch (Exception e) {
             System.out.println("⚠️ Failed to start input hook: " + e.getMessage());
         }
 
-        // Send immediate updates while dragging and when skin changes
-        overlay.setOnPositionChanged((x, y) -> {
-            if (connected && client != null) {
+        // === Wire overlay → network (local authority) ===
+        overlay.setEvents(new DuckEvents() {
+            @Override
+            public void onPositionChanged(float x, float y) {
+                if (!connected || client == null) return;
                 DuckState me = new DuckState();
                 me.x = x;
                 me.y = y;
-                me.skin = overlay.getDuckSkin(); // current local skin
-                me.water = overlay.getWaterSkin(); // current local water
-                client.sendTCP(me);
-            }
-        });
-        overlay.setOnSkinChanged(skin -> {
-            if (connected && client != null) {
-                System.out.println("[Client] onSkinChanged -> " + skin);
-                DuckState me = new DuckState();
-                me.x = overlay.getDuckX();
-                me.y = overlay.getDuckY();
-                me.skin = skin; // new skin picked
+                me.skin = overlay.getDuckSkin();
                 me.water = overlay.getWaterSkin();
                 client.sendTCP(me);
             }
-        });
-        overlay.setOnWaterChanged(water -> {
-            if (connected && client != null) {
-                System.out.println("[Client] onWaterChanged -> " + water);
+
+            @Override
+            public void onDuckSkinChanged(String duckPath) {
+                if (!connected || client == null) return;
+                System.out.println("[Client] onSkinChanged -> " + duckPath);
+                DuckState me = new DuckState();
+                me.x = overlay.getDuckX();
+                me.y = overlay.getDuckY();
+                me.skin = duckPath;
+                me.water = overlay.getWaterSkin();
+                client.sendTCP(me);
+            }
+
+            @Override
+            public void onWaterSkinChanged(String waterPath) {
+                if (!connected || client == null) return;
+                System.out.println("[Client] onWaterChanged -> " + waterPath);
                 DuckState me = new DuckState();
                 me.x = overlay.getDuckX();
                 me.y = overlay.getDuckY();
                 me.skin = overlay.getDuckSkin();
-                me.water = water; // new water picked
+                me.water = waterPath;
                 client.sendTCP(me);
+            }
+
+            @Override
+            public void onServerIpSubmit(String ip) {
+                System.out.println("🔁 Reconnecting to server at " + ip + "...");
+                connectToServer(ip);
             }
         });
 
-        // Allow changing server IP from overlay menu
-        overlay.setOnServerIpSubmit(ip -> {
-            System.out.println("🔁 Reconnecting to server at " + ip + "...");
-            connectToServer(ip);
-        });
 
-        // Start initial connection
+        // === Connect ===
         connectToServer(serverIP);
 
-        // Main update loop
+        // === Lightweight loop (no per-frame network spam) ===
         new AnimationTimer() {
             @Override
             public void handle(long now) {
-                // Send duck state to server if connected (periodic heartbeat)
-                if (connected && client != null) {
-                    DuckState me = new DuckState();
-                    me.x = overlay.getDuckX();
-                    me.y = overlay.getDuckY();
-                    me.skin = overlay.getDuckSkin();
-                    me.water = overlay.getWaterSkin();
-                    client.sendTCP(me);
+                // Optional heartbeat (disabled by default)
+                if (HEARTBEAT_MS > 0 && connected && client != null) {
+                    long ms = System.currentTimeMillis();
+                    if (ms - lastHeartbeat >= HEARTBEAT_MS) {
+                        lastHeartbeat = ms;
+                        DuckState me = new DuckState();
+                        me.x = overlay.getDuckX();
+                        me.y = overlay.getDuckY();
+                        me.skin = overlay.getDuckSkin();
+                        me.water = overlay.getWaterSkin();
+                        client.sendTCP(me);
+                    }
                 }
 
                 // Update points animation if changed
@@ -114,46 +128,42 @@ public class MainApp extends Application {
     }
 
     private synchronized void connectToServer(String ip) {
-        // Update target IP
         this.serverIP = ip;
 
-        // Stop previous client if any
+        // Stop old client if any
         if (client != null) {
-            try {
-                client.stop();
-            } catch (Exception ignored) {}
+            try { client.stop(); } catch (Exception ignored) {}
             connected = false;
         }
 
         new Thread(() -> {
             try {
-                client = new Client();
+                client = new Client(16384, 4096);
                 client.start();
 
-                // Configure Kryo serialization
+                // IMPORTANT: registration order must match the server
                 Kryo kryo = client.getKryo();
+                kryo.register(HashMap.class);
                 kryo.register(DuckState.class);
                 kryo.register(WorldState.class);
-                kryo.register(HashMap.class);
 
-                // Handle server messages
                 client.addListener(new Listener() {
                     @Override
-                    public void received(Connection c, Object obj) {
-                        if (obj instanceof WorldState worldState) {
-                            // Update overlay with world state on JavaFX thread
-                            Platform.runLater(() -> overlay.updateWorld(worldState.ducks));
+                    public void received(Connection connection, Object object) {
+                        if (object instanceof WorldState worldState && worldState.ducks != null) {
+                            // overlay.updateWorld(...) already does Platform.runLater internally,
+                            // but calling it directly is also fine if you prefer to keep UI-only there.
+                            overlay.updateWorld(worldState.ducks);
                         }
                     }
 
                     @Override
                     public void connected(Connection c) {
                         connected = true;
-                        // Inform overlay of our assigned connection ID
                         Platform.runLater(() -> overlay.setMyId(c.getID()));
                         System.out.println("✅ Connected to DuckBongo server!");
 
-                        // Bootstrap: send current state once on connect so others see us immediately
+                        // Bootstrap: send my current state so others see me immediately
                         DuckState me = new DuckState();
                         me.x = overlay.getDuckX();
                         me.y = overlay.getDuckY();
@@ -169,11 +179,8 @@ public class MainApp extends Application {
                     }
                 });
 
-                // Try to connect to server
                 System.out.println("🔄 Connecting to server at " + this.serverIP + ":54555...");
                 client.connect(5000, this.serverIP, 54555, 54777);
-
-
 
             } catch (IOException e) {
                 System.err.println("❌ Failed to connect to server: " + e.getMessage());
@@ -188,15 +195,12 @@ public class MainApp extends Application {
         if (dataHandler != null) {
             dataHandler.save();
         }
-
         if (inputHook != null) {
             try { inputHook.stop(); } catch (Exception ignored) {}
         }
-
         if (client != null) {
-            client.stop();
+            try { client.stop(); } catch (Exception ignored) {}
         }
-
         System.out.println("👋 DuckBongo client shutting down...");
     }
 
