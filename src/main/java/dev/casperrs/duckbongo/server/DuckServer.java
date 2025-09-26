@@ -4,6 +4,7 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryonet.*;
 import dev.casperrs.duckbongo.network.DuckState;
 import dev.casperrs.duckbongo.network.WorldState;
+import dev.casperrs.duckbongo.network.AssignId;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -14,18 +15,23 @@ public class DuckServer {
 
     public void start(int tcpPort, int udpPort) throws IOException {
         Kryo kryo = server.getKryo();
+
         kryo.register(HashMap.class);
         kryo.register(DuckState.class);
         kryo.register(WorldState.class);
+        kryo.register(AssignId.class);
 
         server.addListener(new Listener() {
             @Override public void connected(Connection c) {
-                // Initialize default duck state for this player
                 DuckState s = new DuckState();
                 s.x = 50; s.y = 50;
                 s.skin = "/assets/skin_parts/ducks/duck_default.png";
                 s.water = "/assets/skin_parts/waters/water_default.png";
                 world.put(c.getID(), s);
+
+                // Tell the client the server-assigned ID
+                server.sendToTCP(c.getID(), new AssignId(c.getID()));
+
                 broadcastSnapshot();
             }
 

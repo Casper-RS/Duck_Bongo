@@ -6,6 +6,7 @@ import dev.casperrs.duckbongo.dataHandler.DataHandler;
 import dev.casperrs.duckbongo.network.DuckState;
 import dev.casperrs.duckbongo.network.WorldState;
 import dev.casperrs.duckbongo.input.InputHook;
+import dev.casperrs.duckbongo.network.AssignId;
 
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
@@ -61,7 +62,7 @@ public class MainApp extends Application {
                 me.y = y;
                 me.skin = overlay.getDuckSkin();
                 me.water = overlay.getWaterSkin();
-                client.sendTCP(me);
+                client.sendUDP(me); // <- send movement over UDP
             }
 
             @Override
@@ -141,29 +142,32 @@ public class MainApp extends Application {
                 client = new Client(16384, 4096);
                 client.start();
 
-                // IMPORTANT: registration order must match the server
                 Kryo kryo = client.getKryo();
+                // MUST match server order:
                 kryo.register(HashMap.class);
                 kryo.register(DuckState.class);
                 kryo.register(WorldState.class);
+                kryo.register(AssignId.class);
 
                 client.addListener(new Listener() {
                     @Override
                     public void received(Connection connection, Object object) {
-                        if (object instanceof WorldState worldState && worldState.ducks != null) {
-                            // overlay.updateWorld(...) already does Platform.runLater internally,
-                            // but calling it directly is also fine if you prefer to keep UI-only there.
-                            overlay.updateWorld(worldState.ducks);
+                        if (object instanceof AssignId a) {
+                            // Use server-assigned id
+                            Platform.runLater(() -> overlay.setMyId(a.id));
+                            return;
+                        }
+                        if (object instanceof WorldState ws && ws.ducks != null) {
+                            overlay.updateWorld(ws.ducks);
                         }
                     }
 
                     @Override
                     public void connected(Connection c) {
                         connected = true;
-                        Platform.runLater(() -> overlay.setMyId(c.getID()));
                         System.out.println("✅ Connected to DuckBongo server!");
 
-                        // Bootstrap: send my current state so others see me immediately
+                        // Send my initial state so others see me quickly
                         DuckState me = new DuckState();
                         me.x = overlay.getDuckX();
                         me.y = overlay.getDuckY();
@@ -175,6 +179,8 @@ public class MainApp extends Application {
                     @Override
                     public void disconnected(Connection c) {
                         connected = false;
+                        // Optional: clear myId so we don't ignore wrong entries
+                        Platform.runLater(() -> overlay.setMyId(-1));
                         System.out.println("❌ Disconnected from server");
                     }
                 });
