@@ -107,12 +107,15 @@ public class DuckOverlay {
         stage.initStyle(StageStyle.TRANSPARENT);
         stage.setAlwaysOnTop(true);
         stage.setScene(scene);
+        stage.sizeToScene();
 
         enableWindowDrag(scene);
         enableToggleOnBar(counterBar);
 
         stage.setX(20);
-        stage.setY(Screen.getPrimary().getVisualBounds().getMaxY() - stage.getHeight() - 18);
+        stage.setX(20);
+        stage.setY(Screen.getPrimary().getVisualBounds().getMaxY() - scene.getHeight() - 18);
+
         column.setTranslateX(10);
         column.setTranslateY(10);
         stage.show();
@@ -146,7 +149,14 @@ public class DuckOverlay {
 
     // ========== Public API ==========
     public void setEvents(DuckEvents events) { this.events = events; }
-    public void setMyId(int id) { this.myId = id; }
+    public void setMyId(int id) {
+        this.myId = id;
+        // If we rendered our own duck as a "remote" before myId was known, remove it now.
+        DuckView ghost = otherDucks.remove(id);
+        if (ghost != null && othersLayer != null) {
+            othersLayer.getChildren().remove(ghost.node());
+        }
+    }
 
     public float getDuckX() { return (float) column.getTranslateX(); }
     public float getDuckY() { return (float) column.getTranslateY(); }
@@ -171,6 +181,12 @@ public class DuckOverlay {
 
     public void updateWorld(Map<Integer, DuckState> world) {
         Platform.runLater(() -> {
+
+            // extra safety: if a ghost of *me* exists, remove it now
+            DuckView ghost = otherDucks.remove(myId);
+            if (ghost != null && othersLayer != null) {
+                othersLayer.getChildren().remove(ghost.node());
+            }
             // Upsert remotes
             for (var e : world.entrySet()) {
                 int id = e.getKey();
@@ -180,6 +196,7 @@ public class DuckOverlay {
                 DuckView dv = otherDucks.get(id);
                 if (dv == null) {
                     dv = new DuckView(DUCK_WIDTH, false);
+                    dv.node().setMouseTransparent(true);
                     dv.rememberPaths(s.skin, s.water);
                     dv.setSkins(loadFlexible(getClass(), ResourceUtils.normDuck(s.skin)),
                             loadFlexible(getClass(), ResourceUtils.normWater(s.water)));
