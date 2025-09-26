@@ -28,7 +28,7 @@ public class MainApp extends Application {
     private InputHook inputHook;
     private Client client;
     private boolean connected = false;
-    private volatile String serverIP = "localhost";
+    private volatile String serverIP = "13.62.96.190";
 
     @Override
     public void start(Stage stage) {
@@ -172,6 +172,8 @@ public class MainApp extends Application {
                 // Try to connect to server
                 System.out.println("🔄 Connecting to server at " + this.serverIP + ":54555...");
                 client.connect(5000, this.serverIP, 54555, 54777);
+
+
 
             } catch (IOException e) {
                 System.err.println("❌ Failed to connect to server: " + e.getMessage());
