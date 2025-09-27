@@ -60,6 +60,8 @@ public class DuckOverlay {
     // Dragging state
     private double pressScreenX, pressScreenY, dragOffsetX, dragOffsetY, barPressScreenX, barPressScreenY;
     private boolean isDragging, didDrag;
+    // Track which remote duck we're currently dragging locally
+    private volatile int draggingRemoteId = -1;
 
     public DuckOverlay(Stage stage, PointsManager points) {
         this.stage = stage;
@@ -99,22 +101,23 @@ public class DuckOverlay {
         othersLayer = new Group();
         Group root = new Group(othersLayer, column);
 
-        Scene scene = new Scene(root,
-                Math.max(DUCK_WIDTH + 120, BAR_WIDTH + 5 + MENU_ICON) + 20,
-                DUCK_WIDTH + BAR_HEIGHT + 60);
+        // Make the scene span the full screen so ducks can move anywhere
+        var vb = Screen.getPrimary().getVisualBounds();
+        Scene scene = new Scene(root, vb.getWidth(), vb.getHeight());
         scene.setFill(null);
 
         stage.initStyle(StageStyle.TRANSPARENT);
         stage.setAlwaysOnTop(true);
         stage.setScene(scene);
-        stage.sizeToScene();
+        stage.setX(vb.getMinX());
+        stage.setY(vb.getMinY());
 
         enableWindowDrag(scene);
         enableToggleOnBar(counterBar);
 
-        stage.setX(20);
-        stage.setX(20);
-        stage.setY(Screen.getPrimary().getVisualBounds().getMaxY() - scene.getHeight() - 18);
+        // Initial placement of local duck near bottom-left; users can drag anywhere afterwards
+        stage.setX(vb.getMinX());
+        stage.setY(vb.getMinY());
 
         column.setTranslateX(10);
         column.setTranslateY(10);
@@ -139,7 +142,12 @@ public class DuckOverlay {
             e.consume();
         });
         localDuck.node().addEventHandler(MouseEvent.MOUSE_RELEASED, e -> {
-            if (events != null) events.onPositionChanged((float) column.getTranslateX(), (float) column.getTranslateY());
+            if (events != null) {
+                float fx = (float) column.getTranslateX();
+                float fy = (float) column.getTranslateY();
+                events.onPositionChanged(fx, fy);
+                events.onPositionSettled(fx, fy);
+            }
             isDragging = false;
         });
 
@@ -157,11 +165,21 @@ public class DuckOverlay {
             othersLayer.getChildren().remove(ghost.node());
         }
     }
+    public int getMyId() { return this.myId; }
 
     public float getDuckX() { return (float) column.getTranslateX(); }
     public float getDuckY() { return (float) column.getTranslateY(); }
     public String getDuckSkin() { return duckSkin; }
     public String getWaterSkin() { return waterSkin; }
+
+    // Set local duck position from code (e.g., sync to server spawn) without causing network spam
+    public void setLocalPosition(float x, float y, boolean notify) {
+        Platform.runLater(() -> {
+            column.setTranslateX(x);
+            column.setTranslateY(y);
+            if (notify && events != null) events.onPositionChanged(x, y);
+        });
+    }
 
     public void changeDuckSkin(String path) {
         Platform.runLater(() -> {
@@ -196,13 +214,42 @@ public class DuckOverlay {
                 DuckView dv = otherDucks.get(id);
                 if (dv == null) {
                     dv = new DuckView(DUCK_WIDTH, false);
-                    dv.node().setMouseTransparent(true);
+                    dv.node().setMouseTransparent(false);
                     dv.rememberPaths(s.skin, s.water);
                     dv.setSkins(loadFlexible(getClass(), ResourceUtils.normDuck(s.skin)),
                             loadFlexible(getClass(), ResourceUtils.normWater(s.water)));
                     otherDucks.put(id, dv);
                     othersLayer.getChildren().add(dv.node());
                     column.toFront();
+                    // Enable dragging of this remote duck
+                    final DuckView dvRef = dv;
+                    final double[] oPress = new double[2];
+                    final double[] oStart = new double[2];
+                    dvRef.node().addEventHandler(MouseEvent.MOUSE_PRESSED, e2 -> {
+                        draggingRemoteId = id;
+                        oPress[0] = e2.getSceneX(); oPress[1] = e2.getSceneY();
+                        oStart[0] = dvRef.node().getTranslateX(); oStart[1] = dvRef.node().getTranslateY();
+                        e2.consume();
+                    });
+                    dvRef.node().addEventHandler(MouseEvent.MOUSE_DRAGGED, e2 -> {
+                        double dx2 = e2.getSceneX() - oPress[0];
+                        double dy2 = e2.getSceneY() - oPress[1];
+                        float nx = (float)(oStart[0] + dx2);
+                        float ny = (float)(oStart[1] + dy2);
+                        dvRef.setTranslate(nx, ny);
+                        if (events != null) events.onOtherMoved(id, nx, ny);
+                        e2.consume();
+                    });
+                    dvRef.node().addEventHandler(MouseEvent.MOUSE_RELEASED, e2 -> {
+                        float nx = (float) dvRef.node().getTranslateX();
+                        float ny = (float) dvRef.node().getTranslateY();
+                        if (events != null) {
+                            events.onOtherMoved(id, nx, ny);
+                            events.onOtherSettled(id, nx, ny);
+                        }
+                        draggingRemoteId = -1;
+                        e2.consume();
+                    });
                 } else {
                     if (!Objects.equals(dv.duckPath(), s.skin) || !Objects.equals(dv.waterPath(), s.water)) {
                         dv.rememberPaths(s.skin, s.water);
@@ -210,7 +257,10 @@ public class DuckOverlay {
                                 loadFlexible(getClass(), ResourceUtils.normWater(s.water)));
                     }
                 }
-                dv.setTranslate(s.x, s.y);
+                // Do not override local drag feedback for the duck we are dragging right now
+                if (id != draggingRemoteId) {
+                    dv.setTranslate(s.x, s.y);
+                }
             }
 
             // Remove stale
@@ -289,11 +339,15 @@ public class DuckOverlay {
 
     private void enableWindowDrag(Scene scene) {
         scene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+            // Only allow window dragging when the press is on the empty scene/root, not on duck nodes
+            if (e.getTarget() != scene.getRoot()) return;
             pressScreenX = e.getScreenX(); pressScreenY = e.getScreenY();
             dragOffsetX  = pressScreenX - stage.getX(); dragOffsetY = pressScreenY - stage.getY();
             didDrag = false;
         });
         scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
+            // Only move window when dragging the empty scene/root
+            if (e.getTarget() != scene.getRoot()) return;
             double dx = Math.abs(e.getScreenX() - pressScreenX);
             double dy = Math.abs(e.getScreenY() - pressScreenY);
             if (dx > 8 || dy > 8) {

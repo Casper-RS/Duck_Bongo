@@ -5,6 +5,7 @@ import dev.casperrs.duckbongo.core.PointsManager;
 import dev.casperrs.duckbongo.dataHandler.DataHandler;
 import dev.casperrs.duckbongo.network.DuckState;
 import dev.casperrs.duckbongo.network.WorldState;
+import dev.casperrs.duckbongo.network.MoveOther;
 import dev.casperrs.duckbongo.input.InputHook;
 import dev.casperrs.duckbongo.network.AssignId;
 
@@ -20,6 +21,7 @@ import com.esotericsoftware.kryonet.Listener;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 
 public class MainApp extends Application {
 
@@ -30,11 +32,17 @@ public class MainApp extends Application {
     private InputHook inputHook;
     private Client client;
     private volatile boolean connected = false;
-    private volatile String serverIP = "13.62.96.190";
+    private volatile String serverIP = "localhost"; //13.62.96.190
 
     // Optional: tiny throttle if you want to send heartbeat occasionally (ms)
     private static final long HEARTBEAT_MS = 0; // set to 0 to disable heartbeat
     private long lastHeartbeat = 0;
+
+    // Throttle movement packets so other clients see smoother updates (about 20 Hz)
+    private static final long MOVE_SEND_INTERVAL_MS = 50;
+    private long lastMoveSentMs = 0;
+    // Per-target throttle for moving other users' ducks
+    private final Map<Integer, Long> lastOtherMoveSentMs = new HashMap<>();
 
     @Override
     public void start(Stage stage) {
@@ -57,12 +65,28 @@ public class MainApp extends Application {
             @Override
             public void onPositionChanged(float x, float y) {
                 if (!connected || client == null) return;
+                long now = System.currentTimeMillis();
+                if (now - lastMoveSentMs < MOVE_SEND_INTERVAL_MS) return;
+                lastMoveSentMs = now;
                 DuckState me = new DuckState();
                 me.x = x;
                 me.y = y;
                 me.skin = overlay.getDuckSkin();
                 me.water = overlay.getWaterSkin();
-                client.sendUDP(me); // <- send movement over UDP
+                client.sendUDP(me); // send movement over UDP
+            }
+
+            @Override
+            public void onPositionSettled(float x, float y) {
+                if (!connected || client == null) return;
+                // Send an immediate final pose to ensure others have the exact resting position
+                DuckState me = new DuckState();
+                me.x = x;
+                me.y = y;
+                me.skin = overlay.getDuckSkin();
+                me.water = overlay.getWaterSkin();
+                me.settled = true;
+                client.sendUDP(me);
             }
 
             @Override
@@ -94,8 +118,32 @@ public class MainApp extends Application {
                 System.out.println("🔁 Reconnecting to server at " + ip + "...");
                 connectToServer(ip);
             }
-        });
+            @Override
+            public void onOtherMoved(int targetId, float x, float y) {
+                if (!connected || client == null) return;
+                long now = System.currentTimeMillis();
+                long last = lastOtherMoveSentMs.getOrDefault(targetId, 0L);
+                if (now - last < MOVE_SEND_INTERVAL_MS) return;
+                lastOtherMoveSentMs.put(targetId, now);
+                MoveOther msg = new MoveOther();
+                msg.targetId = targetId;
+                msg.x = x;
+                msg.y = y;
+                msg.settled = false;
+                client.sendUDP(msg);
+            }
 
+            @Override
+            public void onOtherSettled(int targetId, float x, float y) {
+                if (!connected || client == null) return;
+                MoveOther msg = new MoveOther();
+                msg.targetId = targetId;
+                msg.x = x;
+                msg.y = y;
+                msg.settled = true;
+                client.sendUDP(msg);
+            }
+        });
 
         // === Connect ===
         connectToServer(serverIP);
@@ -148,6 +196,7 @@ public class MainApp extends Application {
                 kryo.register(DuckState.class);
                 kryo.register(WorldState.class);
                 kryo.register(AssignId.class);
+                kryo.register(MoveOther.class);
 
                 client.addListener(new Listener() {
                     @Override
@@ -158,6 +207,14 @@ public class MainApp extends Application {
                             return;
                         }
                         if (object instanceof WorldState ws && ws.ducks != null) {
+                            // Sync my own local duck to the server-assigned position once myId is known
+                            int myId = overlay.getMyId();
+                            if (myId >= 0) {
+                                DuckState mine = ws.ducks.get(myId);
+                                if (mine != null) {
+                                    overlay.setLocalPosition(mine.x, mine.y, false);
+                                }
+                            }
                             overlay.updateWorld(ws.ducks);
                         }
                     }
@@ -166,14 +223,9 @@ public class MainApp extends Application {
                     public void connected(Connection c) {
                         connected = true;
                         System.out.println("✅ Connected to DuckBongo server!");
-
-                        // Send my initial state so others see me quickly
-                        DuckState me = new DuckState();
-                        me.x = overlay.getDuckX();
-                        me.y = overlay.getDuckY();
-                        me.skin = overlay.getDuckSkin();
-                        me.water = overlay.getWaterSkin();
-                        client.sendTCP(me);
+                        // Do NOT send initial position here. The server already spawned us
+                        // with a randomized position and broadcasted a snapshot. We'll sync
+                        // our local position to the server snapshot when it arrives.
                     }
 
                     @Override
