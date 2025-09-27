@@ -38,6 +38,10 @@ public class MainApp extends Application {
     private static final long HEARTBEAT_MS = 0; // set to 0 to disable heartbeat
     private long lastHeartbeat = 0;
 
+    // Periodic autosave interval (ms)
+    private static final long AUTOSAVE_MS = 30000; // 30s
+    private long lastAutosaveMs = 0;
+
     // Throttle movement packets so other clients see smoother updates (about 20 Hz)
     private static final long MOVE_SEND_INTERVAL_MS = 50;
     private long lastMoveSentMs = 0;
@@ -51,6 +55,18 @@ public class MainApp extends Application {
 
         // === Persistence ===
         dataHandler.initAndLoad();
+        // Update counter to reflect loaded points
+        overlay.updateCounter(points.get());
+
+        // Save points when the window is closed
+        stage.setOnCloseRequest(e -> {
+            try { dataHandler.save(); } catch (Exception ignore) {}
+        });
+
+        // JVM shutdown hook as an extra safety net
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try { dataHandler.save(); } catch (Exception ignored) {}
+        }, "PointsSaveHook"));
 
         // === Input Hook (adds points) ===
         try {
@@ -75,6 +91,7 @@ public class MainApp extends Application {
                 me.y = (float) (y / h);
                 me.skin = overlay.getDuckSkin();
                 me.water = overlay.getWaterSkin();
+                me.username = dataHandler.getCurrentUsername();
                 client.sendUDP(me); // send movement over UDP
             }
 
@@ -89,6 +106,7 @@ public class MainApp extends Application {
                 me.y = (float) (y / h);
                 me.skin = overlay.getDuckSkin();
                 me.water = overlay.getWaterSkin();
+                me.username = dataHandler.getCurrentUsername();
                 me.settled = true;
                 client.sendUDP(me);
             }
@@ -104,6 +122,7 @@ public class MainApp extends Application {
                 me.y = (float) (overlay.getDuckY() / h);
                 me.skin = duckPath;
                 me.water = overlay.getWaterSkin();
+                me.username = dataHandler.getCurrentUsername();
                 client.sendTCP(me);
             }
 
@@ -118,6 +137,7 @@ public class MainApp extends Application {
                 me.y = (float) (overlay.getDuckY() / h);
                 me.skin = overlay.getDuckSkin();
                 me.water = waterPath;
+                me.username = dataHandler.getCurrentUsername();
                 client.sendTCP(me);
             }
 
@@ -176,6 +196,7 @@ public class MainApp extends Application {
                         me.y = (float) (overlay.getDuckY() / h);
                         me.skin = overlay.getDuckSkin();
                         me.water = overlay.getWaterSkin();
+                        me.username = dataHandler.getCurrentUsername();
                         client.sendTCP(me);
                     }
                 }
@@ -184,7 +205,15 @@ public class MainApp extends Application {
                 long currentPoints = points.get();
                 if (currentPoints != lastPointsSeen) {
                     overlay.punch();
+                    overlay.updateCounter(currentPoints);
                     lastPointsSeen = currentPoints;
+                }
+
+                // Periodic autosave
+                long nowMs = System.currentTimeMillis();
+                if (nowMs - lastAutosaveMs >= AUTOSAVE_MS) {
+                    lastAutosaveMs = nowMs;
+                    try { dataHandler.save(); } catch (Exception ignored) {}
                 }
             }
         }.start();
@@ -232,6 +261,7 @@ public class MainApp extends Application {
                                 c.y = (float) (s.y * h);
                                 c.skin = s.skin;
                                 c.water = s.water;
+                                c.username = s.username;
                                 px.put(e.getKey(), c);
                             }
                             // Sync my own local duck to the server-assigned position once myId is known
@@ -253,6 +283,18 @@ public class MainApp extends Application {
                         // Do NOT send initial position here. The server already spawned us
                         // with a randomized position and broadcasted a snapshot. We'll sync
                         // our local position to the server snapshot when it arrives.
+                        // However, send an identity snapshot so other clients can see our username/skins.
+                        try {
+                            DuckState me = new DuckState();
+                            double w = Math.max(1.0, overlay.getSceneWidth());
+                            double h = Math.max(1.0, overlay.getSceneHeight());
+                            me.x = (float) (overlay.getDuckX() / w);
+                            me.y = (float) (overlay.getDuckY() / h);
+                            me.skin = overlay.getDuckSkin();
+                            me.water = overlay.getWaterSkin();
+                            me.username = dataHandler.getCurrentUsername();
+                            client.sendTCP(me);
+                        } catch (Exception ignored) {}
                     }
 
                     @Override

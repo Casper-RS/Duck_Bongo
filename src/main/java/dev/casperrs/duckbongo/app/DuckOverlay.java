@@ -40,6 +40,8 @@ public class DuckOverlay {
     private final PointsManager points;
     private final Stage stage;
     private final ContextMenu menu;
+    // Counter label reference for updates
+    private Label counterLabel;
 
     // Local + remote ducks
     private final DuckView localDuck = new DuckView(DUCK_WIDTH, true);
@@ -62,6 +64,8 @@ public class DuckOverlay {
     private boolean isDragging, didDrag;
     // Track which remote duck we're currently dragging locally
     private volatile int draggingRemoteId = -1;
+    // UI preferences
+    private boolean showNames = true;
 
     public DuckOverlay(Stage stage, PointsManager points) {
         this.stage = stage;
@@ -73,6 +77,7 @@ public class DuckOverlay {
         // Counter bar
         Label counterText = new Label(format(points.get()));
         counterText.setStyle("-fx-text-fill:#1f2428;-fx-font-size:12px;-fx-font-weight:bold;");
+        this.counterLabel = counterText;
         Region bg = new Region();
         bg.setPrefSize(BAR_WIDTH, BAR_HEIGHT);
         bg.setStyle("""
@@ -180,6 +185,14 @@ public class DuckOverlay {
         return (sc != null) ? sc.getHeight() : Screen.getPrimary().getVisualBounds().getHeight();
     }
 
+    public void setShowNames(boolean show) {
+        this.showNames = show;
+        // Apply to all existing remote ducks
+        for (DuckView dv : otherDucks.values()) {
+            dv.setNameVisible(showNames);
+        }
+    }
+
     // Set local duck position from code (e.g., sync to server spawn) without causing network spam
     public void setLocalPosition(float x, float y, boolean notify) {
         Platform.runLater(() -> {
@@ -226,6 +239,8 @@ public class DuckOverlay {
                     dv.rememberPaths(s.skin, s.water);
                     dv.setSkins(loadFlexible(getClass(), ResourceUtils.normDuck(s.skin)),
                             loadFlexible(getClass(), ResourceUtils.normWater(s.water)));
+                    dv.setName(s.username);
+                    dv.setNameVisible(showNames);
                     otherDucks.put(id, dv);
                     othersLayer.getChildren().add(dv.node());
                     column.toFront();
@@ -264,6 +279,8 @@ public class DuckOverlay {
                         dv.setSkins(loadFlexible(getClass(), ResourceUtils.normDuck(s.skin)),
                                 loadFlexible(getClass(), ResourceUtils.normWater(s.water)));
                     }
+                    dv.setName(s.username);
+                    dv.setNameVisible(showNames);
                 }
                 // Do not override local drag feedback for the duck we are dragging right now
                 if (id != draggingRemoteId) {
@@ -314,10 +331,14 @@ public class DuckOverlay {
         });
 
         MenuItem addOne = new MenuItem("Add 1 bread (test)");
-        addOne.setOnAction(e -> { points.add(1); counterText.setText(format(points.get())); punch(); });
+        addOne.setOnAction(e -> { points.add(1); updateCounter(points.get()); punch(); });
 
         MenuItem toggleTop = new MenuItem("Toggle always-on-top");
         toggleTop.setOnAction(e -> stage.setAlwaysOnTop(!stage.isAlwaysOnTop()));
+
+        CheckMenuItem toggleNames = new CheckMenuItem("Show usernames");
+        toggleNames.setSelected(showNames);
+        toggleNames.setOnAction(e -> setShowNames(toggleNames.isSelected()));
 
         MenuItem setIp = new MenuItem("Set Server IP...");
         setIp.setOnAction(e -> {
@@ -342,7 +363,7 @@ public class DuckOverlay {
         MenuItem exit = new MenuItem("Exit");
         exit.setOnAction(e -> { stage.close(); Platform.exit(); System.exit(0); });
 
-        return new ContextMenu(setIp, skinPopup, addOne, copyCount, toggleTop, exit);
+        return new ContextMenu(setIp, skinPopup, addOne, copyCount, toggleTop, toggleNames, exit);
     }
 
     private void enableWindowDrag(Scene scene) {
@@ -381,6 +402,13 @@ public class DuckOverlay {
         DecimalFormat df = new DecimalFormat("#,###");
         df.setDecimalFormatSymbols(sym);
         return df.format(n);
+    }
+
+    // Public method to update the counter label safely on the FX thread
+    public void updateCounter(long value) {
+        Platform.runLater(() -> {
+            if (counterLabel != null) counterLabel.setText(format(value));
+        });
     }
 
     // Tiny hamburger button that opens the ContextMenu at its right edge

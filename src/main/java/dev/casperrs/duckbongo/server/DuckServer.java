@@ -59,6 +59,7 @@ public class DuckServer {
                     mine.y = s.y;
                     mine.skin = s.skin;
                     mine.water = s.water;
+                    mine.username = s.username;
                     if (s.settled) {
                         broadcastSnapshot(true); // final pose: send immediately
                     } else {
@@ -96,7 +97,7 @@ public class DuckServer {
         for (var e : world.entrySet()) {
             DuckState s = e.getValue();
             DuckState cpy = new DuckState();
-            cpy.x = s.x; cpy.y = s.y; cpy.skin = s.skin; cpy.water = s.water;
+            cpy.x = s.x; cpy.y = s.y; cpy.skin = s.skin; cpy.water = s.water; cpy.username = s.username;
             copy.put(e.getKey(), cpy);
         }
         WorldState ws = new WorldState(copy);

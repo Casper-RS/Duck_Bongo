@@ -85,6 +85,10 @@ public class DataHandler {
         }
     }
 
+    public String getCurrentUsername() {
+        return (currentUser != null) ? currentUser.username() : "Player";
+    }
+
     // ===== Helpers =====
 
     private void loadProps() {
@@ -101,8 +105,14 @@ public class DataHandler {
     }
 
     private void storeProps() {
-        try (FileOutputStream fos = new FileOutputStream(FILE_NAME)) {
-            props.store(fos, "DuckBongo local settings");
+        try {
+            Path parent = Path.of(FILE_NAME).getParent();
+            if (parent != null) {
+                try { Files.createDirectories(parent); } catch (IOException ignored) {}
+            }
+            try (FileOutputStream fos = new FileOutputStream(FILE_NAME)) {
+                props.store(fos, "DuckBongo local settings");
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
