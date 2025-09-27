@@ -66,6 +66,7 @@ public class DuckOverlay {
     private volatile int draggingRemoteId = -1;
     // UI preferences
     private boolean showNames = true;
+    private volatile boolean movementSyncEnabled = true;
 
     public DuckOverlay(Stage stage, PointsManager points) {
         this.stage = stage;
@@ -171,6 +172,8 @@ public class DuckOverlay {
         }
     }
     public int getMyId() { return this.myId; }
+    public boolean isMovementSyncEnabled() { return movementSyncEnabled; }
+    public void setMovementSyncEnabled(boolean enabled) { this.movementSyncEnabled = enabled; }
 
     public float getDuckX() { return (float) column.getTranslateX(); }
     public float getDuckY() { return (float) column.getTranslateY(); }
@@ -283,8 +286,10 @@ public class DuckOverlay {
                     dv.setNameVisible(showNames);
                 }
                 // Do not override local drag feedback for the duck we are dragging right now
-                if (id != draggingRemoteId) {
-                    dv.setTranslate(s.x, s.y);
+                if (movementSyncEnabled) {
+                    if (id != draggingRemoteId) {
+                        dv.setTranslate(s.x, s.y);
+                    }
                 }
             }
 
@@ -340,6 +345,10 @@ public class DuckOverlay {
         toggleNames.setSelected(showNames);
         toggleNames.setOnAction(e -> setShowNames(toggleNames.isSelected()));
 
+        CheckMenuItem toggleMovement = new CheckMenuItem("Sync movement with server");
+        toggleMovement.setSelected(movementSyncEnabled);
+        toggleMovement.setOnAction(e -> setMovementSyncEnabled(toggleMovement.isSelected()));
+
         MenuItem setIp = new MenuItem("Set Server IP...");
         setIp.setOnAction(e -> {
             TextInputDialog dlg = new TextInputDialog();
@@ -363,7 +372,7 @@ public class DuckOverlay {
         MenuItem exit = new MenuItem("Exit");
         exit.setOnAction(e -> { stage.close(); Platform.exit(); System.exit(0); });
 
-        return new ContextMenu(setIp, skinPopup, addOne, copyCount, toggleTop, toggleNames, exit);
+        return new ContextMenu(setIp, skinPopup, addOne, copyCount, toggleTop, toggleNames, toggleMovement, exit);
     }
 
     private void enableWindowDrag(Scene scene) {

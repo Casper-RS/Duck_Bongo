@@ -81,6 +81,7 @@ public class MainApp extends Application {
             @Override
             public void onPositionChanged(float x, float y) {
                 if (!connected || client == null) return;
+                if (!overlay.isMovementSyncEnabled()) return;
                 long now = System.currentTimeMillis();
                 if (now - lastMoveSentMs < MOVE_SEND_INTERVAL_MS) return;
                 lastMoveSentMs = now;
@@ -98,6 +99,7 @@ public class MainApp extends Application {
             @Override
             public void onPositionSettled(float x, float y) {
                 if (!connected || client == null) return;
+                if (!overlay.isMovementSyncEnabled()) return;
                 // Send an immediate final pose to ensure others have the exact resting position
                 DuckState me = new DuckState();
                 double w = Math.max(1.0, overlay.getSceneWidth());
@@ -149,6 +151,7 @@ public class MainApp extends Application {
             @Override
             public void onOtherMoved(int targetId, float x, float y) {
                 if (!connected || client == null) return;
+                if (!overlay.isMovementSyncEnabled()) return;
                 long now = System.currentTimeMillis();
                 long last = lastOtherMoveSentMs.getOrDefault(targetId, 0L);
                 if (now - last < MOVE_SEND_INTERVAL_MS) return;
@@ -166,6 +169,7 @@ public class MainApp extends Application {
             @Override
             public void onOtherSettled(int targetId, float x, float y) {
                 if (!connected || client == null) return;
+                if (!overlay.isMovementSyncEnabled()) return;
                 MoveOther msg = new MoveOther();
                 msg.targetId = targetId;
                 double w = Math.max(1.0, overlay.getSceneWidth());
@@ -269,7 +273,9 @@ public class MainApp extends Application {
                             if (myId >= 0) {
                                 DuckState mine = px.get(myId);
                                 if (mine != null) {
-                                    overlay.setLocalPosition(mine.x, mine.y, false);
+                                    if (overlay.isMovementSyncEnabled()) {
+                                        overlay.setLocalPosition(mine.x, mine.y, false);
+                                    }
                                 }
                             }
                             overlay.updateWorld(px);
