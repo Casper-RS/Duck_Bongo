@@ -171,6 +171,14 @@ public class DuckOverlay {
     public float getDuckY() { return (float) column.getTranslateY(); }
     public String getDuckSkin() { return duckSkin; }
     public String getWaterSkin() { return waterSkin; }
+    public double getSceneWidth() {
+        Scene sc = stage.getScene();
+        return (sc != null) ? sc.getWidth() : Screen.getPrimary().getVisualBounds().getWidth();
+    }
+    public double getSceneHeight() {
+        Scene sc = stage.getScene();
+        return (sc != null) ? sc.getHeight() : Screen.getPrimary().getVisualBounds().getHeight();
+    }
 
     // Set local duck position from code (e.g., sync to server spawn) without causing network spam
     public void setLocalPosition(float x, float y, boolean notify) {

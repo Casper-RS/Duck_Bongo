@@ -32,7 +32,7 @@ public class MainApp extends Application {
     private InputHook inputHook;
     private Client client;
     private volatile boolean connected = false;
-    private volatile String serverIP = "localhost"; //13.62.96.190
+    private volatile String serverIP = "13.62.96.190"; //13.62.96.190
 
     // Optional: tiny throttle if you want to send heartbeat occasionally (ms)
     private static final long HEARTBEAT_MS = 0; // set to 0 to disable heartbeat
@@ -69,8 +69,10 @@ public class MainApp extends Application {
                 if (now - lastMoveSentMs < MOVE_SEND_INTERVAL_MS) return;
                 lastMoveSentMs = now;
                 DuckState me = new DuckState();
-                me.x = x;
-                me.y = y;
+                double w = Math.max(1.0, overlay.getSceneWidth());
+                double h = Math.max(1.0, overlay.getSceneHeight());
+                me.x = (float) (x / w);
+                me.y = (float) (y / h);
                 me.skin = overlay.getDuckSkin();
                 me.water = overlay.getWaterSkin();
                 client.sendUDP(me); // send movement over UDP
@@ -81,8 +83,10 @@ public class MainApp extends Application {
                 if (!connected || client == null) return;
                 // Send an immediate final pose to ensure others have the exact resting position
                 DuckState me = new DuckState();
-                me.x = x;
-                me.y = y;
+                double w = Math.max(1.0, overlay.getSceneWidth());
+                double h = Math.max(1.0, overlay.getSceneHeight());
+                me.x = (float) (x / w);
+                me.y = (float) (y / h);
                 me.skin = overlay.getDuckSkin();
                 me.water = overlay.getWaterSkin();
                 me.settled = true;
@@ -94,8 +98,10 @@ public class MainApp extends Application {
                 if (!connected || client == null) return;
                 System.out.println("[Client] onSkinChanged -> " + duckPath);
                 DuckState me = new DuckState();
-                me.x = overlay.getDuckX();
-                me.y = overlay.getDuckY();
+                double w = Math.max(1.0, overlay.getSceneWidth());
+                double h = Math.max(1.0, overlay.getSceneHeight());
+                me.x = (float) (overlay.getDuckX() / w);
+                me.y = (float) (overlay.getDuckY() / h);
                 me.skin = duckPath;
                 me.water = overlay.getWaterSkin();
                 client.sendTCP(me);
@@ -106,8 +112,10 @@ public class MainApp extends Application {
                 if (!connected || client == null) return;
                 System.out.println("[Client] onWaterChanged -> " + waterPath);
                 DuckState me = new DuckState();
-                me.x = overlay.getDuckX();
-                me.y = overlay.getDuckY();
+                double w = Math.max(1.0, overlay.getSceneWidth());
+                double h = Math.max(1.0, overlay.getSceneHeight());
+                me.x = (float) (overlay.getDuckX() / w);
+                me.y = (float) (overlay.getDuckY() / h);
                 me.skin = overlay.getDuckSkin();
                 me.water = waterPath;
                 client.sendTCP(me);
@@ -127,8 +135,10 @@ public class MainApp extends Application {
                 lastOtherMoveSentMs.put(targetId, now);
                 MoveOther msg = new MoveOther();
                 msg.targetId = targetId;
-                msg.x = x;
-                msg.y = y;
+                double w = Math.max(1.0, overlay.getSceneWidth());
+                double h = Math.max(1.0, overlay.getSceneHeight());
+                msg.x = (float) (x / w);
+                msg.y = (float) (y / h);
                 msg.settled = false;
                 client.sendUDP(msg);
             }
@@ -138,8 +148,10 @@ public class MainApp extends Application {
                 if (!connected || client == null) return;
                 MoveOther msg = new MoveOther();
                 msg.targetId = targetId;
-                msg.x = x;
-                msg.y = y;
+                double w = Math.max(1.0, overlay.getSceneWidth());
+                double h = Math.max(1.0, overlay.getSceneHeight());
+                msg.x = (float) (x / w);
+                msg.y = (float) (y / h);
                 msg.settled = true;
                 client.sendUDP(msg);
             }
@@ -158,8 +170,10 @@ public class MainApp extends Application {
                     if (ms - lastHeartbeat >= HEARTBEAT_MS) {
                         lastHeartbeat = ms;
                         DuckState me = new DuckState();
-                        me.x = overlay.getDuckX();
-                        me.y = overlay.getDuckY();
+                        double w = Math.max(1.0, overlay.getSceneWidth());
+                        double h = Math.max(1.0, overlay.getSceneHeight());
+                        me.x = (float) (overlay.getDuckX() / w);
+                        me.y = (float) (overlay.getDuckY() / h);
                         me.skin = overlay.getDuckSkin();
                         me.water = overlay.getWaterSkin();
                         client.sendTCP(me);
@@ -207,15 +221,28 @@ public class MainApp extends Application {
                             return;
                         }
                         if (object instanceof WorldState ws && ws.ducks != null) {
+                            double w = Math.max(1.0, overlay.getSceneWidth());
+                            double h = Math.max(1.0, overlay.getSceneHeight());
+                            // Build a pixel-space world snapshot for the overlay
+                            HashMap<Integer, DuckState> px = new HashMap<>();
+                            for (var e : ws.ducks.entrySet()) {
+                                DuckState s = e.getValue();
+                                DuckState c = new DuckState();
+                                c.x = (float) (s.x * w);
+                                c.y = (float) (s.y * h);
+                                c.skin = s.skin;
+                                c.water = s.water;
+                                px.put(e.getKey(), c);
+                            }
                             // Sync my own local duck to the server-assigned position once myId is known
                             int myId = overlay.getMyId();
                             if (myId >= 0) {
-                                DuckState mine = ws.ducks.get(myId);
+                                DuckState mine = px.get(myId);
                                 if (mine != null) {
                                     overlay.setLocalPosition(mine.x, mine.y, false);
                                 }
                             }
-                            overlay.updateWorld(ws.ducks);
+                            overlay.updateWorld(px);
                         }
                     }
 

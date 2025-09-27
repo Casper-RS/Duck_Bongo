@@ -32,9 +32,10 @@ public class DuckServer {
         server.addListener(new Listener() {
             @Override public void connected(Connection c) {
                 DuckState s = new DuckState();
-                // Randomize initial spawn so new ducks aren't stacked
-                s.x = 60 + rng.nextInt(840); // ~60..900
-                s.y = 60 + rng.nextInt(540); // ~60..600
+                // Randomize initial spawn in normalized space (0..1) so clients can scale to their resolution
+                // Keep a small margin so ducks don't spawn at edges
+                s.x = 0.1f + rng.nextFloat() * 0.8f; // 0.1..0.9
+                s.y = 0.1f + rng.nextFloat() * 0.8f; // 0.1..0.9
                 s.skin = "/assets/skin_parts/ducks/duck_default.png";
                 s.water = "/assets/skin_parts/waters/water_default.png";
                 world.put(c.getID(), s);
@@ -53,6 +54,7 @@ public class DuckServer {
             @Override public void received(Connection c, Object obj) {
                 if (obj instanceof DuckState s) {
                     DuckState mine = world.computeIfAbsent(c.getID(), k -> new DuckState());
+                    // Positions are normalized ratios coming from clients (0..1)
                     mine.x = s.x;
                     mine.y = s.y;
                     mine.skin = s.skin;
@@ -65,6 +67,7 @@ public class DuckServer {
                 } else if (obj instanceof MoveOther mo) {
                     DuckState target = world.get(mo.targetId);
                     if (target != null) {
+                        // Normalized ratios for remote-move as well
                         target.x = mo.x;
                         target.y = mo.y;
                         if (mo.settled) {
