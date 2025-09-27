@@ -31,7 +31,7 @@ public final class DuckView {
         nameLabel.setVisible(false);
         nameLabel.setMouseTransparent(true);
 
-        VBox box = new VBox(2, nameLabel, image);
+        VBox box = new VBox(-40, nameLabel, image);
         box.setAlignment(Pos.CENTER);
 
         root = new StackPane(box);

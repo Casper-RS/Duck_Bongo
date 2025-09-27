@@ -99,7 +99,7 @@ public class DuckOverlay {
         HBox barRow = new HBox(6, counterBar, hamburger);
         barRow.setAlignment(Pos.CENTER);
 
-        column = new VBox(0, localStack, barRow);
+        column = new VBox(-32, localStack, barRow);
         column.setAlignment(Pos.TOP_LEFT);
         column.setPadding(new Insets(2, 4, 4, 4));
 
