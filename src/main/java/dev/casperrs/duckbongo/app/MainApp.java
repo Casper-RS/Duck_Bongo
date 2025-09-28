@@ -8,6 +8,7 @@ import dev.casperrs.duckbongo.network.WorldState;
 import dev.casperrs.duckbongo.network.MoveOther;
 import dev.casperrs.duckbongo.input.InputHook;
 import dev.casperrs.duckbongo.network.AssignId;
+import dev.casperrs.duckbongo.ActivityExample;
 
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
@@ -58,6 +59,14 @@ public class MainApp extends Application {
         // Update counter to reflect loaded points
         overlay.updateCounter(points.get());
 
+        // === Discord Rich Presence (optional) ===
+        try {
+            // Start Discord SDK and set initial activity; runs callbacks on background thread
+            ActivityExample.runActivityHook(points);
+        } catch (Exception e) {
+            System.out.println("⚠️ Failed to init Discord activity: " + e.getMessage());
+        }
+
         // Save points when the window is closed
         stage.setOnCloseRequest(e -> {
             try { dataHandler.save(); } catch (Exception ignore) {}
@@ -70,7 +79,8 @@ public class MainApp extends Application {
 
         // === Input Hook (adds points) ===
         try {
-            inputHook = new InputHook(points, null); // no rich presence updater
+            // Forward input-driven updates to Discord activity (details/state)
+            inputHook = new InputHook(points, ActivityExample::updateActivity);
             inputHook.start();
         } catch (Exception e) {
             System.out.println("⚠️ Failed to start input hook: " + e.getMessage());
