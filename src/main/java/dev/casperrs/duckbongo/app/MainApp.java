@@ -58,13 +58,22 @@ public class MainApp extends Application {
         dataHandler.initAndLoad();
         // Update counter to reflect loaded points
         overlay.updateCounter(points.get());
+        // Load saved skins
+        try {
+            overlay.changeDuckSkin(dataHandler.getCurrentDuckSkin());
+            overlay.changeWaterSkin(dataHandler.getCurrentWaterSkin());
+        } catch (Exception ignored) {}
+        // Apply saved preferences
+        overlay.setShowNames(dataHandler.getShowNames());
+        overlay.setMovementSyncEnabled(dataHandler.getMovementSync());
 
         // === Discord Rich Presence (optional) ===
         try {
             // Start Discord SDK and set initial activity; runs callbacks on background thread
             ActivityExample.runActivityHook(points);
-        } catch (Exception e) {
-            System.out.println("⚠️ Failed to init Discord activity: " + e.getMessage());
+        } catch (Throwable t) {
+            // Catch NoClassDefFoundError and other linkage issues too
+            System.out.println("⚠️ Failed to init Discord activity: " + t);
         }
 
         // Save points when the window is closed
@@ -125,38 +134,52 @@ public class MainApp extends Application {
 
             @Override
             public void onDuckSkinChanged(String duckPath) {
-                if (!connected || client == null) return;
                 System.out.println("[Client] onSkinChanged -> " + duckPath);
-                DuckState me = new DuckState();
-                double w = Math.max(1.0, overlay.getSceneWidth());
-                double h = Math.max(1.0, overlay.getSceneHeight());
-                me.x = (float) (overlay.getDuckX() / w);
-                me.y = (float) (overlay.getDuckY() / h);
-                me.skin = duckPath;
-                me.water = overlay.getWaterSkin();
-                me.username = dataHandler.getCurrentUsername();
-                client.sendTCP(me);
+                // persist selection regardless of connection
+                dataHandler.updateSkins(duckPath, overlay.getWaterSkin());
+                if (connected && client != null) {
+                    DuckState me = new DuckState();
+                    double w = Math.max(1.0, overlay.getSceneWidth());
+                    double h = Math.max(1.0, overlay.getSceneHeight());
+                    me.x = (float) (overlay.getDuckX() / w);
+                    me.y = (float) (overlay.getDuckY() / h);
+                    me.skin = duckPath;
+                    me.water = overlay.getWaterSkin();
+                    me.username = dataHandler.getCurrentUsername();
+                    client.sendTCP(me);
+                }
             }
 
             @Override
             public void onWaterSkinChanged(String waterPath) {
-                if (!connected || client == null) return;
                 System.out.println("[Client] onWaterChanged -> " + waterPath);
-                DuckState me = new DuckState();
-                double w = Math.max(1.0, overlay.getSceneWidth());
-                double h = Math.max(1.0, overlay.getSceneHeight());
-                me.x = (float) (overlay.getDuckX() / w);
-                me.y = (float) (overlay.getDuckY() / h);
-                me.skin = overlay.getDuckSkin();
-                me.water = waterPath;
-                me.username = dataHandler.getCurrentUsername();
-                client.sendTCP(me);
+                // persist selection regardless of connection
+                dataHandler.updateSkins(overlay.getDuckSkin(), waterPath);
+                if (connected && client != null) {
+                    DuckState me = new DuckState();
+                    double w = Math.max(1.0, overlay.getSceneWidth());
+                    double h = Math.max(1.0, overlay.getSceneHeight());
+                    me.x = (float) (overlay.getDuckX() / w);
+                    me.y = (float) (overlay.getDuckY() / h);
+                    me.skin = overlay.getDuckSkin();
+                    me.water = waterPath;
+                    me.username = dataHandler.getCurrentUsername();
+                    client.sendTCP(me);
+                }
             }
 
             @Override
             public void onServerIpSubmit(String ip) {
                 System.out.println("🔁 Reconnecting to server at " + ip + "...");
                 connectToServer(ip);
+            }
+            @Override
+            public void onShowNamesChanged(boolean showNames) {
+                dataHandler.updatePreferences(showNames, overlay.isMovementSyncEnabled());
+            }
+            @Override
+            public void onMovementSyncChanged(boolean enabled) {
+                dataHandler.updatePreferences(overlay.isShowNames(), enabled);
             }
             @Override
             public void onOtherMoved(int targetId, float x, float y) {

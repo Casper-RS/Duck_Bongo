@@ -89,6 +89,67 @@ public class DataHandler {
         return (currentUser != null) ? currentUser.username() : "Player";
     }
 
+    public String getCurrentDuckSkin() {
+        return (currentUser != null && currentUser.duckSkin() != null)
+                ? currentUser.duckSkin()
+                : "/assets/skin_parts/ducks/duck_default.png";
+    }
+
+    public String getCurrentWaterSkin() {
+        return (currentUser != null && currentUser.waterSkin() != null)
+                ? currentUser.waterSkin()
+                : "/assets/skin_parts/waters/water_default.png";
+    }
+
+    public void updateSkins(String duckSkin, String waterSkin) {
+        if (currentUserId == null) return;
+        try {
+            data.updateSkins(currentUserId, duckSkin, waterSkin);
+            // Update cached record
+            if (currentUser != null) {
+                currentUser = new FetchUserData.UserRecord(
+                        currentUser.userId(),
+                        currentUser.username(),
+                        currentUser.clickCount(),
+                        duckSkin,
+                        waterSkin,
+                        currentUser.showNames(),
+                        currentUser.movementSync()
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public boolean getShowNames() {
+        return currentUser != null && currentUser.showNames();
+    }
+
+    public boolean getMovementSync() {
+        return currentUser == null || currentUser.movementSync();
+    }
+
+    public void updatePreferences(boolean showNames, boolean movementSync) {
+        if (currentUserId == null) return;
+        try {
+            data.updatePreferences(currentUserId, showNames, movementSync);
+            if (currentUser != null) {
+                currentUser = new FetchUserData.UserRecord(
+                        currentUser.userId(),
+                        currentUser.username(),
+                        currentUser.clickCount(),
+                        currentUser.duckSkin(),
+                        currentUser.waterSkin(),
+                        showNames,
+                        movementSync
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     // ===== Helpers =====
 
     private void loadProps() {

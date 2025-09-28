@@ -25,6 +25,22 @@ public class DatabaseConnection {
                   ClickCount INTEGER NOT NULL DEFAULT 0
                 )
             """);
+
+            // Migration: add skin columns if they don't exist yet
+            try (Statement alter = c.createStatement()) {
+                alter.executeUpdate("ALTER TABLE UserData ADD COLUMN DuckSkin TEXT DEFAULT '/assets/skin_parts/ducks/duck_default.png'");
+            } catch (SQLException ignored) { /* column may already exist */ }
+            try (Statement alter = c.createStatement()) {
+                alter.executeUpdate("ALTER TABLE UserData ADD COLUMN WaterSkin TEXT DEFAULT '/assets/skin_parts/waters/water_default.png'");
+            } catch (SQLException ignored) { /* column may already exist */ }
+
+            // Migration: add preference columns (1=true, 0=false)
+            try (Statement alter = c.createStatement()) {
+                alter.executeUpdate("ALTER TABLE UserData ADD COLUMN ShowNames INTEGER NOT NULL DEFAULT 1");
+            } catch (SQLException ignored) { /* column may already exist */ }
+            try (Statement alter = c.createStatement()) {
+                alter.executeUpdate("ALTER TABLE UserData ADD COLUMN MovementSync INTEGER NOT NULL DEFAULT 1");
+            } catch (SQLException ignored) { /* column may already exist */ }
         }
     }
 }

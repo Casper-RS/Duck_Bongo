@@ -10,4 +10,7 @@ public interface DuckEvents {
     void onDuckSkinChanged(String duckPath);
     void onWaterSkinChanged(String waterPath);
     void onServerIpSubmit(String ip);
+    // Preferences
+    void onShowNamesChanged(boolean showNames);
+    void onMovementSyncChanged(boolean enabled);
 }

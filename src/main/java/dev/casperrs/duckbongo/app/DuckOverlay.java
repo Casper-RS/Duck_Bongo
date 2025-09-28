@@ -40,6 +40,9 @@ public class DuckOverlay {
     private final PointsManager points;
     private final Stage stage;
     private final ContextMenu menu;
+    // Keep handle to toggles to reflect programmatic changes
+    private CheckMenuItem toggleNamesItem;
+    private CheckMenuItem toggleMovementItem;
     // Counter label reference for updates
     private Label counterLabel;
 
@@ -173,7 +176,10 @@ public class DuckOverlay {
     }
     public int getMyId() { return this.myId; }
     public boolean isMovementSyncEnabled() { return movementSyncEnabled; }
-    public void setMovementSyncEnabled(boolean enabled) { this.movementSyncEnabled = enabled; }
+    public void setMovementSyncEnabled(boolean enabled) {
+        this.movementSyncEnabled = enabled;
+        if (toggleMovementItem != null) toggleMovementItem.setSelected(enabled);
+    }
 
     public float getDuckX() { return (float) column.getTranslateX(); }
     public float getDuckY() { return (float) column.getTranslateY(); }
@@ -194,7 +200,9 @@ public class DuckOverlay {
         for (DuckView dv : otherDucks.values()) {
             dv.setNameVisible(showNames);
         }
+        if (toggleNamesItem != null) toggleNamesItem.setSelected(showNames);
     }
+    public boolean isShowNames() { return showNames; }
 
     // Set local duck position from code (e.g., sync to server spawn) without causing network spam
     public void setLocalPosition(float x, float y, boolean notify) {
@@ -341,13 +349,21 @@ public class DuckOverlay {
         MenuItem toggleTop = new MenuItem("Toggle always-on-top");
         toggleTop.setOnAction(e -> stage.setAlwaysOnTop(!stage.isAlwaysOnTop()));
 
-        CheckMenuItem toggleNames = new CheckMenuItem("Show usernames");
-        toggleNames.setSelected(showNames);
-        toggleNames.setOnAction(e -> setShowNames(toggleNames.isSelected()));
+        toggleNamesItem = new CheckMenuItem("Show usernames");
+        toggleNamesItem.setSelected(showNames);
+        toggleNamesItem.setOnAction(e -> {
+            boolean sel = toggleNamesItem.isSelected();
+            setShowNames(sel);
+            if (events != null) events.onShowNamesChanged(sel);
+        });
 
-        CheckMenuItem toggleMovement = new CheckMenuItem("Sync movement with server");
-        toggleMovement.setSelected(movementSyncEnabled);
-        toggleMovement.setOnAction(e -> setMovementSyncEnabled(toggleMovement.isSelected()));
+        toggleMovementItem = new CheckMenuItem("Sync movement with server");
+        toggleMovementItem.setSelected(movementSyncEnabled);
+        toggleMovementItem.setOnAction(e -> {
+            boolean sel = toggleMovementItem.isSelected();
+            setMovementSyncEnabled(sel);
+            if (events != null) events.onMovementSyncChanged(sel);
+        });
 
         MenuItem setIp = new MenuItem("Set Server IP...");
         setIp.setOnAction(e -> {
@@ -372,7 +388,7 @@ public class DuckOverlay {
         MenuItem exit = new MenuItem("Exit");
         exit.setOnAction(e -> { stage.close(); Platform.exit(); System.exit(0); });
 
-        return new ContextMenu(setIp, skinPopup, addOne, copyCount, toggleTop, toggleNames, toggleMovement, exit);
+        return new ContextMenu(setIp, skinPopup, addOne, copyCount, toggleTop, toggleNamesItem, toggleMovementItem, exit);
     }
 
     private void enableWindowDrag(Scene scene) {
