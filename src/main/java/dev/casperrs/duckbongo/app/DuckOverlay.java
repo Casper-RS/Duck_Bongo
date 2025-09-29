@@ -47,9 +47,10 @@ public class DuckOverlay {
     private Label counterLabel;
 
     // Local + remote ducks
-    private final DuckView localDuck = new DuckView(DUCK_WIDTH, true);
+    private DuckView localDuck;
     private final Map<Integer, DuckView> otherDucks = new HashMap<>();
     private volatile int myId = -1;
+    private boolean initialized = false;
 
     // Containers
     private Group othersLayer;
@@ -74,9 +75,15 @@ public class DuckOverlay {
     public DuckOverlay(Stage stage, PointsManager points) {
         this.stage = stage;
         this.points = points;
-
+        
+        // Initialize the local duck
+        this.localDuck = new DuckView(DUCK_WIDTH, true);
+        
         // Compose initial local duck image
         refreshLocalImage();
+        
+        // Mark as initialized
+        this.initialized = true;
 
         // Counter bar
         Label counterText = new Label(format(points.get()));
@@ -229,88 +236,232 @@ public class DuckOverlay {
         });
     }
 
+    // Cache for loaded images to avoid reloading the same images multiple times
+    private final Map<String, Image> imageCache = new HashMap<>();
+    
+    /**
+     * Updates the world state with new duck positions and states.
+     * Optimized to reduce memory usage and improve performance.
+     */
     public void updateWorld(Map<Integer, DuckState> world) {
+        if (world == null || !initialized) {
+            return;
+        }
+        
         Platform.runLater(() -> {
-
-            // extra safety: if a ghost of *me* exists, remove it now
-            DuckView ghost = otherDucks.remove(myId);
-            if (ghost != null && othersLayer != null) {
-                othersLayer.getChildren().remove(ghost.node());
-            }
-            // Upsert remotes
-            for (var e : world.entrySet()) {
-                int id = e.getKey();
-                if (id == myId) continue;
-                DuckState s = e.getValue();
-
-                DuckView dv = otherDucks.get(id);
-                if (dv == null) {
-                    dv = new DuckView(DUCK_WIDTH, false);
-                    dv.node().setMouseTransparent(false);
-                    dv.rememberPaths(s.skin, s.water);
-                    dv.setSkins(loadFlexible(getClass(), ResourceUtils.normDuck(s.skin)),
-                            loadFlexible(getClass(), ResourceUtils.normWater(s.water)));
-                    dv.setName(s.username);
-                    dv.setNameVisible(showNames);
-                    otherDucks.put(id, dv);
-                    othersLayer.getChildren().add(dv.node());
-                    column.toFront();
-                    // Enable dragging of this remote duck
-                    final DuckView dvRef = dv;
-                    final double[] oPress = new double[2];
-                    final double[] oStart = new double[2];
-                    dvRef.node().addEventHandler(MouseEvent.MOUSE_PRESSED, e2 -> {
-                        draggingRemoteId = id;
-                        oPress[0] = e2.getSceneX(); oPress[1] = e2.getSceneY();
-                        oStart[0] = dvRef.node().getTranslateX(); oStart[1] = dvRef.node().getTranslateY();
-                        e2.consume();
-                    });
-                    dvRef.node().addEventHandler(MouseEvent.MOUSE_DRAGGED, e2 -> {
-                        double dx2 = e2.getSceneX() - oPress[0];
-                        double dy2 = e2.getSceneY() - oPress[1];
-                        float nx = (float)(oStart[0] + dx2);
-                        float ny = (float)(oStart[1] + dy2);
-                        dvRef.setTranslate(nx, ny);
-                        if (events != null) events.onOtherMoved(id, nx, ny);
-                        e2.consume();
-                    });
-                    dvRef.node().addEventHandler(MouseEvent.MOUSE_RELEASED, e2 -> {
-                        float nx = (float) dvRef.node().getTranslateX();
-                        float ny = (float) dvRef.node().getTranslateY();
-                        if (events != null) {
-                            events.onOtherMoved(id, nx, ny);
-                            events.onOtherSettled(id, nx, ny);
-                        }
-                        draggingRemoteId = -1;
-                        e2.consume();
-                    });
-                } else {
-                    if (!Objects.equals(dv.duckPath(), s.skin) || !Objects.equals(dv.waterPath(), s.water)) {
-                        dv.rememberPaths(s.skin, s.water);
-                        dv.setSkins(loadFlexible(getClass(), ResourceUtils.normDuck(s.skin)),
-                                loadFlexible(getClass(), ResourceUtils.normWater(s.water)));
-                    }
-                    dv.setName(s.username);
-                    dv.setNameVisible(showNames);
+            try {
+                // Extra safety: if a ghost of *me* exists, remove it now
+                DuckView ghost = otherDucks.remove(myId);
+                if (ghost != null) {
+                    cleanupDuckView(ghost);
                 }
-                // Do not override local drag feedback for the duck we are dragging right now
-                if (movementSyncEnabled) {
-                    if (id != draggingRemoteId) {
-                        dv.setTranslate(s.x, s.y);
+
+                // Process updates for existing ducks and add new ones
+                for (Map.Entry<Integer, DuckState> entry : world.entrySet()) {
+                    int id = entry.getKey();
+                    if (id == myId) continue; // Skip self
+                    
+                    DuckState state = entry.getValue();
+                    DuckView duck = otherDucks.get(id);
+                    
+                    if (duck == null) {
+                        // Create new duck view only when needed
+                        createNewDuckView(id, state);
+                    } else {
+                        // Update existing duck
+                        updateExistingDuckView(duck, state, id);
                     }
                 }
-            }
 
-            // Remove stale
-            otherDucks.keySet().removeIf(id -> {
-                if (!world.containsKey(id)) {
-                    DuckView dv = otherDucks.get(id);
-                    if (dv != null) othersLayer.getChildren().remove(dv.node());
-                    return true;
+                // Remove ducks that are no longer in the world
+                removeStaleDucks(world);
+                
+                // Suggest garbage collection if we've removed a lot of ducks
+                if (otherDucks.size() < world.size() / 2) {
+                    System.gc();
                 }
-                return false;
-            });
+            } catch (Exception e) {
+                System.err.println("Error in updateWorld: " + e.getMessage());
+                e.printStackTrace();
+            }
         });
+    }
+    
+    /**
+     * Creates a new duck view and sets up its event handlers
+     */
+    private void createNewDuckView(int id, DuckState state) {
+        DuckView dv = new DuckView(DUCK_WIDTH, false);
+        try {
+            dv.node().setMouseTransparent(false);
+            
+            // Load and cache images
+            String duckPath = ResourceUtils.normDuck(state.skin);
+            String waterPath = ResourceUtils.normWater(state.water);
+            
+            Image duckImg = loadAndCacheImage(duckPath);
+            Image waterImg = loadAndCacheImage(waterPath);
+            
+            // Set up the duck view
+            dv.rememberPaths(state.skin, state.water);
+            dv.setSkins(duckImg, waterImg);
+            dv.setName(state.username);
+            dv.setNameVisible(showNames);
+            
+            // Add to our tracking
+            otherDucks.put(id, dv);
+            if (othersLayer != null) {
+                othersLayer.getChildren().add(dv.node());
+            }
+            
+            // Set initial position
+            if (movementSyncEnabled && id != draggingRemoteId) {
+                dv.setTranslate(state.x, state.y);
+            }
+            
+            // Set up drag handlers
+            setupDuckDragHandlers(dv, id);
+            
+            if (column != null) {
+                column.toFront();
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to create duck view: " + e.getMessage());
+            cleanupDuckView(dv);
+        }
+    }
+    
+    /**
+     * Updates an existing duck view with new state
+     */
+    private void updateExistingDuckView(DuckView duck, DuckState state, int id) {
+        try {
+            // Update skins if changed
+            if (!Objects.equals(duck.duckPath(), state.skin) || 
+                !Objects.equals(duck.waterPath(), state.water)) {
+                
+                String duckPath = ResourceUtils.normDuck(state.skin);
+                String waterPath = ResourceUtils.normWater(state.water);
+                
+                Image duckImg = loadAndCacheImage(duckPath);
+                Image waterImg = loadAndCacheImage(waterPath);
+                
+                duck.rememberPaths(state.skin, state.water);
+                duck.setSkins(duckImg, waterImg);
+            }
+            
+            // Update name and visibility
+            duck.setName(state.username);
+            duck.setNameVisible(showNames);
+            
+            // Update position if we're not currently dragging this duck
+            if (movementSyncEnabled && id != draggingRemoteId) {
+                duck.setTranslate(state.x, state.y);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to update duck view: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Removes ducks that are no longer in the world
+     */
+    private void removeStaleDucks(Map<Integer, DuckState> world) {
+        Iterator<Map.Entry<Integer, DuckView>> it = otherDucks.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Integer, DuckView> entry = it.next();
+            if (!world.containsKey(entry.getKey())) {
+                // Remove from the scene and clean up
+                if (othersLayer != null) {
+                    othersLayer.getChildren().remove(entry.getValue().node());
+                }
+                cleanupDuckView(entry.getValue());
+                it.remove();
+            }
+        }
+    }
+    
+    /**
+     * Loads an image and caches it for future use
+     */
+    private Image loadAndCacheImage(String path) {
+        if (path == null || path.isEmpty()) {
+            return null;
+        }
+        
+        // Check cache first
+        Image cached = imageCache.get(path);
+        if (cached != null) {
+            return cached;
+        }
+        
+        // Load and cache the image
+        Image img = loadFlexible(getClass(), path);
+        if (img != null) {
+            // Limit cache size to prevent memory issues
+            if (imageCache.size() > 50) {
+                // Remove the first entry (oldest) if cache is too large
+                Iterator<String> it = imageCache.keySet().iterator();
+                if (it.hasNext()) {
+                    imageCache.remove(it.next());
+                }
+            }
+            imageCache.put(path, img);
+        }
+        return img;
+    }
+    
+    /**
+     * Sets up drag handlers for a duck view
+     */
+    private void setupDuckDragHandlers(DuckView duck, int id) {
+        final double[] press = new double[2];
+        final double[] start = new double[2];
+        
+        duck.node().addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
+            draggingRemoteId = id;
+            press[0] = e.getSceneX();
+            press[1] = e.getSceneY();
+            start[0] = duck.node().getTranslateX();
+            start[1] = duck.node().getTranslateY();
+            e.consume();
+        });
+        
+        duck.node().addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> {
+            double dx = e.getSceneX() - press[0];
+            double dy = e.getSceneY() - press[1];
+            float nx = (float)(start[0] + dx);
+            float ny = (float)(start[1] + dy);
+            duck.setTranslate(nx, ny);
+            if (events != null) {
+                events.onOtherMoved(id, nx, ny);
+            }
+            e.consume();
+        });
+        
+        duck.node().addEventHandler(MouseEvent.MOUSE_RELEASED, e -> {
+            float nx = (float) duck.node().getTranslateX();
+            float ny = (float) duck.node().getTranslateY();
+            if (events != null) {
+                events.onOtherMoved(id, nx, ny);
+                events.onOtherSettled(id, nx, ny);
+            }
+            draggingRemoteId = -1;
+            e.consume();
+        });
+    }
+    
+    /**
+     * Cleans up resources used by a duck view
+     */
+    private void cleanupDuckView(DuckView duck) {
+        if (duck != null) {
+            try {
+                duck.close();
+            } catch (Exception e) {
+                System.err.println("Error cleaning up duck view: " + e.getMessage());
+            }
+        }
     }
 
     public void punch() {
