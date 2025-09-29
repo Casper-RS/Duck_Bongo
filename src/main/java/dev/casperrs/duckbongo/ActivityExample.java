@@ -36,10 +36,10 @@ public class ActivityExample {
             core = new Core(params);
             startTime = Instant.now();
 
-            // Set up join request callback using the activity manager
-            // Note: The actual join request handling will be done through the sendRequestReply method
-            // when a join request is received from Discord
-            System.out.println("Discord activity manager initialized");
+            // Note: The Discord Game SDK for Java doesn't directly expose join request events.
+            // Join requests will be handled through the Discord client's UI directly.
+            // The sendRequestReply method is available to respond to join requests.
+            System.out.println("Discord activity manager initialized. Join requests will be handled through Discord's UI.");
 
             // Initial activity
             updateLobbyActivity(false);
@@ -107,7 +107,6 @@ public class ActivityExample {
      */
     public static String createLobby(int maxPlayers, Consumer<String> onJoinRequest) {
         if (core == null) return null;
-        
         inLobby = true;
         currentPlayers = 1;
         ActivityExample.maxPlayers = maxPlayers;
@@ -116,31 +115,42 @@ public class ActivityExample {
         
         // Set up the activity with proper permissions
         try (Activity activity = new Activity()) {
-            activity.setDetails("In Lobby");
-            activity.setState("Players: 1/" + maxPlayers);
+            activity.setDetails("Playing Duck Bongo");
+            activity.setState("In Lobby - " + currentPlayers + "/" + maxPlayers);
+            activity.setType(ActivityType.PLAYING);
             
             // Set up party information
             ActivityParty party = activity.party();
-            party.size().setCurrentSize(1);
+            party.size().setCurrentSize(currentPlayers);
             party.size().setMaxSize(maxPlayers);
             party.setID("party_" + lobbyId);
             
-            // Set up join secret
+            // Set up join secret - this is crucial for the "Ask to Join" button
             ActivitySecrets secrets = activity.secrets();
-            secrets.setJoinSecret("join_" + lobbyId);
+            String joinSecret = "join_" + lobbyId;
+            secrets.setJoinSecret(joinSecret);
             
-            // Set activity type and enable join requests
-            activity.setType(ActivityType.PLAYING);
-            // Note: The Discord SDK should automatically handle join requests with the join secret
+            // Set up match secret (required for join to work)
+            String matchSecret = "match_" + lobbyId;
+            secrets.setMatchSecret(matchSecret);
             
-            // Update the activity
-            core.activityManager().updateActivity(activity);
+            // Set activity timestamps
+            activity.timestamps().setStart(Instant.now());
+            
+            // Update the activity with a callback to verify it was successful
+            core.activityManager().updateActivity(activity, result -> {
+                if (result == Result.OK) {
+                    System.out.println("Successfully updated activity with join secret: " + joinSecret);
+                } else {
+                    System.err.println("Failed to update activity: " + result);
+                }
+            });
         }
         
         System.out.println("Created lobby with ID: " + lobbyId);
         return lobbyId;
     }
-
+    
     /**
      * Joins an existing lobby
      */
@@ -149,8 +159,30 @@ public class ActivityExample {
         
         inLobby = true;
         ActivityExample.lobbyId = lobbyId;
-        // In a real implementation, you would connect to the game server here
-        updateLobbyActivity(false);
+        
+        // Set up the activity for joining
+        try (Activity activity = new Activity()) {
+            activity.setDetails("Joining Duck Bongo Lobby");
+            activity.setState("Connecting...");
+            activity.setType(ActivityType.PLAYING);
+            
+            // Set up party information
+            ActivityParty party = activity.party();
+            party.setID("party_" + lobbyId);
+            
+            // Set up join secret
+            ActivitySecrets secrets = activity.secrets();
+            secrets.setJoinSecret("join_" + lobbyId);
+            
+            // Update the activity
+            core.activityManager().updateActivity(activity, result -> {
+                if (result == Result.OK) {
+                    System.out.println("Successfully updated activity for joining lobby: " + lobbyId);
+                } else {
+                    System.err.println("Failed to update activity for joining: " + result);
+                }
+            });
+        }
     }
 
     /**
