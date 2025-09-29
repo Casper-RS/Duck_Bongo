@@ -310,6 +310,8 @@ public class MainApp extends Application {
                                         overlay.setLocalPosition(mine.x, mine.y, false);
                                     }
                                 }
+                                // Update Discord activity with current player count
+                                updateDiscordPlayerCount(px.size());
                             }
                             overlay.updateWorld(px);
                         }
@@ -368,6 +370,19 @@ public class MainApp extends Application {
             try { client.stop(); } catch (Exception ignored) {}
         }
         System.out.println("👋 DuckBongo client shutting down...");
+    }
+
+    /**
+     * Updates the Discord activity with the current player count
+     * @param count Number of players in the server
+     */
+    private void updateDiscordPlayerCount(int count) {
+        try {
+            // Update Discord activity with current player count
+            ActivityExample.updatePlayerCount(count);
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to update Discord activity: " + e.getMessage());
+        }
     }
 
     public static void main(String[] args) {
