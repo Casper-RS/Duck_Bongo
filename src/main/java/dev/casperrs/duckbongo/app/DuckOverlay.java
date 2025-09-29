@@ -568,7 +568,7 @@ public class DuckOverlay {
     }
 
     private void scheduleBreadDrops() {
-        breadScheduler.scheduleAtFixedRate(() -> Platform.runLater(this::spawnBread), 1, 1, TimeUnit.MINUTES);
+        breadScheduler.scheduleAtFixedRate(() -> Platform.runLater(this::spawnBread), 10, 10, TimeUnit.MINUTES);
     }
 
     private void spawnBread() {
