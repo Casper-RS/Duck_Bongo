@@ -13,6 +13,7 @@ import dev.casperrs.duckbongo.ActivityExample;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.scene.control.Alert;
 import javafx.stage.Stage;
 
 import com.esotericsoftware.kryo.Kryo;
@@ -33,7 +34,7 @@ public class MainApp extends Application {
     private InputHook inputHook;
     private Client client;
     private volatile boolean connected = false;
-    private volatile String serverIP = "13.62.96.190"; //13.62.96.190
+    private volatile String serverIP = "localhost"; //13.62.96.190
 
     // Optional: tiny throttle if you want to send heartbeat occasionally (ms)
     private static final long HEARTBEAT_MS = 0; // set to 0 to disable heartbeat
@@ -48,6 +49,10 @@ public class MainApp extends Application {
     private long lastMoveSentMs = 0;
     // Per-target throttle for moving other users' ducks
     private final Map<Integer, Long> lastOtherMoveSentMs = new HashMap<>();
+
+    private String currentLobbyId;
+    private boolean isLobbyHost = false;
+    private int maxLobbyPlayers = 4;
 
     @Override
     public void start(Stage stage) {
@@ -67,13 +72,60 @@ public class MainApp extends Application {
         overlay.setShowNames(dataHandler.getShowNames());
         overlay.setMovementSyncEnabled(dataHandler.getMovementSync());
 
-        // === Discord Rich Presence (optional) ===
+        // === Discord Rich Presence with Lobby Support ===
         try {
             // Start Discord SDK and set initial activity; runs callbacks on background thread
             ActivityExample.runActivityHook(points);
-        } catch (Throwable t) {
-            // Catch NoClassDefFoundError and other linkage issues too
-            System.out.println("⚠️ Failed to init Discord activity: " + t);
+            
+            // Set up lobby handlers
+            overlay.setLobbyHandlers(new DuckOverlay.LobbyHandlers() {
+                @Override
+                public void onCreateLobby(int maxPlayers) {
+                    // Create a new lobby
+                    maxLobbyPlayers = maxPlayers;
+                    currentLobbyId = ActivityExample.createLobby(maxPlayers, userIdAndName -> {
+                        // This runs when someone wants to join the lobby
+                        handleJoinRequest(userIdAndName);
+                    });
+                    
+                    if (currentLobbyId != null) {
+                        isLobbyHost = true;
+                        connectToServer("localhost"); // TODO: Get actual server IP
+                    }
+                }
+                
+                @Override
+                public void onJoinLobby(String lobbyId) {
+                    // Join an existing lobby
+                    try {
+                        ActivityExample.joinLobby(lobbyId);
+                        currentLobbyId = lobbyId;
+                        isLobbyHost = false;
+                        connectToServer("localhost"); // TODO: Get actual server IP from lobby
+                    } catch (Exception e) {
+                        System.err.println("Failed to join lobby: " + lobbyId + " - " + e.getMessage());
+                        // Show error to user
+                        Platform.runLater(() -> {
+                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                            alert.setTitle("Join Failed");
+                            alert.setHeaderText("Could not join lobby");
+                            alert.setContentText("The lobby may be full or no longer exists: " + e.getMessage());
+                            alert.showAndWait();
+                        });
+                    }
+                }
+                
+                @Override
+                public void onLeaveLobby() {
+                    // Leave the current lobby
+                    ActivityExample.leaveLobby();
+                    currentLobbyId = null;
+                    isLobbyHost = false;
+                    // TODO: Disconnect from server if needed
+                }
+            });
+        } catch (Exception e) {
+            System.err.println("Failed to initialize Discord RPC: " + e.getMessage());
         }
 
         // Save points when the window is closed
@@ -256,10 +308,37 @@ public class MainApp extends Application {
         }.start();
     }
 
+    /**
+     * Handles incoming join requests when hosting a lobby
+     */
+    private void handleJoinRequest(String userIdAndName) {
+        if (!isLobbyHost || currentLobbyId == null) return;
+        
+        String[] parts = userIdAndName.split(":", 2);
+        if (parts.length != 2) return;
+        
+        String userId = parts[0];
+        String username = parts[1];
+        
+        // Show a dialog to accept/deny the join request
+        Platform.runLater(() -> {
+            boolean accept = overlay.showJoinRequestDialog(username);
+            ActivityExample.respondToJoinRequest(userId, accept);
+            
+            if (accept) {
+                // Update player count when a join request is accepted
+                int currentPlayers = overlay.getPlayerCount() + 1;
+                ActivityExample.updatePlayerCount(currentPlayers, maxLobbyPlayers);
+                
+                // TODO: Notify the game server about the new player
+                System.out.println("Accepted join request from " + username);
+            }
+        });
+    }
+    
     private synchronized void connectToServer(String ip) {
         this.serverIP = ip;
 
-        // Stop old client if any
         if (client != null) {
             try { client.stop(); } catch (Exception ignored) {}
             connected = false;

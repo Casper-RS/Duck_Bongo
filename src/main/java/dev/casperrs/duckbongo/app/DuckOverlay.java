@@ -56,15 +56,15 @@ public class DuckOverlay {
     private VBox column;
 
     // Skins
-    private String waterSkin = "/assets/skin_parts/waters/water_default.png";
     private String duckSkin  = "/assets/skin_parts/ducks/duck_default.png";
+    private String waterSkin = "/assets/skin_parts/waters/water_default.png";
 
     // Events
     private DuckEvents events;
 
-    // Dragging state
-    private double pressScreenX, pressScreenY, dragOffsetX, dragOffsetY, barPressScreenX, barPressScreenY;
-    private boolean isDragging, didDrag;
+    // Drag handling
+    private double pressScreenX, pressScreenY, dragOffsetX, dragOffsetY;
+    private double barPressScreenX, barPressScreenY;
     // Track which remote duck we're currently dragging locally
     private volatile int draggingRemoteId = -1;
     // UI preferences
@@ -138,7 +138,6 @@ public class DuckOverlay {
         localDuck.node().addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
             press[0] = e.getSceneX(); press[1] = e.getSceneY();
             start[0] = column.getTranslateX(); start[1] = column.getTranslateY();
-            isDragging = true;
             column.toFront();
             e.consume();
         });
@@ -157,11 +156,44 @@ public class DuckOverlay {
                 events.onPositionChanged(fx, fy);
                 events.onPositionSettled(fx, fy);
             }
-            isDragging = false;
         });
 
         // Counter punch animation trigger (simple: expose a method you can call externally)
         this.menu = buildContextMenu(counterText);
+    }
+
+    // ========== Lobby Management ==========
+    private LobbyHandlers lobbyHandlers;
+    
+    public interface LobbyHandlers {
+        void onCreateLobby(int maxPlayers);
+        void onJoinLobby(String lobbyId);
+        void onLeaveLobby();
+    }
+    
+    public void setLobbyHandlers(LobbyHandlers handlers) {
+        this.lobbyHandlers = handlers;
+    }
+    
+    public boolean showJoinRequestDialog(String username) {
+        // Simple dialog to accept/deny join requests
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Join Request");
+        alert.setHeaderText(username + " wants to join your lobby");
+        alert.setContentText("Do you want to accept this player?");
+        
+        ButtonType acceptButton = new ButtonType("Accept", ButtonBar.ButtonData.YES);
+        ButtonType denyButton = new ButtonType("Deny", ButtonBar.ButtonData.NO);
+        alert.getButtonTypes().setAll(acceptButton, denyButton);
+        
+        // Show dialog and wait for response
+        java.util.Optional<ButtonType> result = alert.showAndWait();
+        return result.isPresent() && result.get() == acceptButton;
+    }
+    
+    public int getPlayerCount() {
+        // Return 1 for local player + number of other ducks
+        return 1 + otherDucks.size();
     }
 
     // ========== Public API ==========
@@ -336,6 +368,25 @@ public class DuckOverlay {
     }
 
     private ContextMenu buildContextMenu(Label counterText) {
+        // Lobby menu items
+        Menu lobbyMenu = new Menu("Lobby");
+        
+        MenuItem createLobby = new MenuItem("Create Lobby...");
+        createLobby.setOnAction(e -> showCreateLobbyDialog());
+        
+        MenuItem joinLobby = new MenuItem("Join Lobby...");
+        joinLobby.setOnAction(e -> showJoinLobbyDialog());
+        
+        MenuItem leaveLobby = new MenuItem("Leave Lobby");
+        leaveLobby.setOnAction(e -> {
+            if (lobbyHandlers != null) {
+                lobbyHandlers.onLeaveLobby();
+            }
+        });
+        
+        lobbyMenu.getItems().addAll(createLobby, joinLobby, new SeparatorMenuItem(), leaveLobby);
+
+        // Other menu items
         MenuItem copyCount = new MenuItem("Copy count");
         copyCount.setOnAction(e -> {
             ClipboardContent content = new ClipboardContent();
@@ -388,7 +439,8 @@ public class DuckOverlay {
         MenuItem exit = new MenuItem("Exit");
         exit.setOnAction(e -> { stage.close(); Platform.exit(); System.exit(0); });
 
-        return new ContextMenu(setIp, skinPopup, addOne, copyCount, toggleTop, toggleNamesItem, toggleMovementItem, exit);
+        return new ContextMenu(lobbyMenu, new SeparatorMenuItem(), 
+            setIp, skinPopup, addOne, copyCount, toggleTop, toggleNamesItem, toggleMovementItem, exit);
     }
 
     private void enableWindowDrag(Scene scene) {
@@ -396,8 +448,7 @@ public class DuckOverlay {
             // Only allow window dragging when the press is on the empty scene/root, not on duck nodes
             if (e.getTarget() != scene.getRoot()) return;
             pressScreenX = e.getScreenX(); pressScreenY = e.getScreenY();
-            dragOffsetX  = pressScreenX - stage.getX(); dragOffsetY = pressScreenY - stage.getY();
-            didDrag = false;
+            dragOffsetX = pressScreenX - stage.getX(); dragOffsetY = pressScreenY - stage.getY();
         });
         scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
             // Only move window when dragging the empty scene/root
@@ -407,7 +458,50 @@ public class DuckOverlay {
             if (dx > 8 || dy > 8) {
                 stage.setX(e.getScreenX() - dragOffsetX);
                 stage.setY(e.getScreenY() - dragOffsetY);
-                didDrag = true;
+            }
+        });
+    }
+
+    private void showCreateLobbyDialog() {
+        TextInputDialog dialog = new TextInputDialog("4");
+        dialog.setTitle("Create Lobby");
+        dialog.setHeaderText("Create a new lobby");
+        dialog.setContentText("Maximum players (2-8):");
+
+        // Validate input
+        dialog.getEditor().textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue.matches("\\d*")) {
+                dialog.getEditor().setText(newValue.replaceAll("[^\\d]", ""));
+            }
+        });
+
+        dialog.showAndWait().ifPresent(playersStr -> {
+            try {
+                int maxPlayers = Integer.parseInt(playersStr);
+                if (maxPlayers < 2) maxPlayers = 2;
+                if (maxPlayers > 8) maxPlayers = 8;
+                
+                if (lobbyHandlers != null) {
+                    lobbyHandlers.onCreateLobby(maxPlayers);
+                }
+            } catch (NumberFormatException e) {
+                // Use default value if parsing fails
+                if (lobbyHandlers != null) {
+                    lobbyHandlers.onCreateLobby(4);
+                }
+            }
+        });
+    }
+    
+    private void showJoinLobbyDialog() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Join Lobby");
+        dialog.setHeaderText("Join an existing lobby");
+        dialog.setContentText("Enter Lobby ID:");
+
+        dialog.showAndWait().ifPresent(lobbyId -> {
+            if (lobbyHandlers != null && !lobbyId.trim().isEmpty()) {
+                lobbyHandlers.onJoinLobby(lobbyId.trim());
             }
         });
     }
