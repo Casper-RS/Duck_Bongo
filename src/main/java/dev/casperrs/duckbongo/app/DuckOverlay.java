@@ -14,18 +14,25 @@ import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
+import javafx.util.Pair;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.*;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static dev.casperrs.duckbongo.app.utils.ResourceUtils.loadFlexible;
 
@@ -45,6 +52,8 @@ public class DuckOverlay {
     private CheckMenuItem toggleMovementItem;
     // Counter label reference for updates
     private Label counterLabel;
+    private final ScheduledExecutorService breadScheduler = Executors.newSingleThreadScheduledExecutor();
+    private final Random random = new Random();
 
     // Local + remote ducks
     private DuckView localDuck;
@@ -55,6 +64,8 @@ public class DuckOverlay {
     // Containers
     private Group othersLayer;
     private VBox column;
+    private StackPane breadContainer;
+    private boolean breadVisible;
 
     // Skins
     private String waterSkin = "/assets/skin_parts/waters/water_default.png";
@@ -107,7 +118,14 @@ public class DuckOverlay {
         StackPane localStack = new StackPane(localDuck.node()); // bread icon weggelaten voor eenvoud
         localStack.setAlignment(Pos.CENTER_LEFT);
 
-        HBox barRow = new HBox(6, counterBar, hamburger);
+        breadContainer = new StackPane();
+        breadContainer.setPickOnBounds(false);
+        breadContainer.setOpacity(0);
+        breadContainer.setVisible(false);
+        breadContainer.getChildren().add(createBreadNode());
+        StackPane.setAlignment(breadContainer, Pos.CENTER_LEFT);
+
+        HBox barRow = new HBox(6, counterBar, hamburger, breadContainer);
         barRow.setAlignment(Pos.CENTER);
 
         column = new VBox(-32, localStack, barRow);
@@ -138,6 +156,8 @@ public class DuckOverlay {
         column.setTranslateX(10);
         column.setTranslateY(10);
         stage.show();
+
+        scheduleBreadDrops();
 
         // Local dragging of duck (moves whole column)
         final double[] press = new double[2];
@@ -497,6 +517,9 @@ public class DuckOverlay {
         MenuItem addOne = new MenuItem("Add 1 bread (test)");
         addOne.setOnAction(e -> { points.add(1); updateCounter(points.get()); punch(); });
 
+        MenuItem spawnBread = new MenuItem("Spawn bread now");
+        spawnBread.setOnAction(e -> spawnBread());
+
         MenuItem toggleTop = new MenuItem("Toggle always-on-top");
         toggleTop.setOnAction(e -> stage.setAlwaysOnTop(!stage.isAlwaysOnTop()));
 
@@ -530,16 +553,124 @@ public class DuckOverlay {
         MenuItem skinPopup = new MenuItem("Skin Gallery...");
         skinPopup.setOnAction(e -> {
             double x = stage.getX() + 200, y = stage.getY() + 100;
+            var unlocked = (events != null) ? events.getUnlockedCosmetics() : java.util.Collections.<String>emptySet();
+            var locked = (events != null) ? events.getLockedCosmetics() : java.util.Collections.<String>emptyList();
             SkinGallery.show(stage, x, y, new SkinGallery.OnPick() {
                 public void duck(String duckPath)   { changeDuckSkin(duckPath); }
                 public void water(String waterPath) { changeWaterSkin(waterPath); }
-            });
+            }, unlocked, locked);
         });
 
         MenuItem exit = new MenuItem("Exit");
         exit.setOnAction(e -> { stage.close(); Platform.exit(); System.exit(0); });
 
-        return new ContextMenu(setIp, skinPopup, addOne, copyCount, toggleTop, toggleNamesItem, toggleMovementItem, exit);
+        return new ContextMenu(setIp, skinPopup, addOne, spawnBread, copyCount, toggleTop, toggleNamesItem, toggleMovementItem, exit);
+    }
+
+    private void scheduleBreadDrops() {
+        breadScheduler.scheduleAtFixedRate(() -> Platform.runLater(this::spawnBread), 1, 1, TimeUnit.MINUTES);
+    }
+
+    private void spawnBread() {
+        if (breadVisible) return;
+
+        breadVisible = true;
+        breadContainer.setVisible(true);
+        breadContainer.setOpacity(1);
+
+        ScaleTransition drop = new ScaleTransition(Duration.millis(350), breadContainer);
+        drop.setFromY(0.1);
+        drop.setToY(1.0);
+        drop.setFromX(0.1);
+        drop.setToX(1.0);
+        drop.play();
+
+        breadContainer.setOnMouseClicked(e -> openBreadCrate());
+    }
+
+    private StackPane createBreadNode() {
+        Image breadImage = loadFlexible(getClass(), "/assets/Bread.png");
+        ImageView breadView = breadImage != null ? new ImageView(breadImage) : null;
+
+        if (breadView != null) {
+            breadView.setFitWidth(42);
+            breadView.setPreserveRatio(true);
+        }
+
+        Rectangle highlight = new Rectangle(46, 46);
+        highlight.setArcWidth(10);
+        highlight.setArcHeight(10);
+        highlight.setFill(Color.rgb(255, 245, 200, 0.35));
+        highlight.setStroke(Color.web("#cf9f4d"));
+        highlight.setStrokeWidth(1.2);
+        highlight.setOpacity(0);
+
+        StackPane wrapper = new StackPane(highlight);
+        if (breadView != null) wrapper.getChildren().add(breadView);
+        wrapper.setAlignment(Pos.CENTER);
+        wrapper.setPadding(new Insets(4));
+        wrapper.setCursor(javafx.scene.Cursor.HAND);
+
+        wrapper.setOnMouseEntered(e -> highlight.setOpacity(1));
+        wrapper.setOnMouseExited(e -> highlight.setOpacity(0));
+
+        return wrapper;
+    }
+
+    private void openBreadCrate() {
+        breadVisible = false;
+        breadContainer.setVisible(false);
+        breadContainer.setOpacity(0);
+
+        Pair<String, Boolean> reward = rollCosmeticReward();
+        if (reward == null) {
+            points.add(5);
+            updateCounter(points.get());
+            showPopupNotification("Bread Crate", "You found crumbs… +5 points");
+            return;
+        }
+
+        String message = reward.getValue()
+                ? "New cosmetic unlocked: " + reward.getKey()
+                : "You got some crumbs and +5 points";
+
+        if (!reward.getValue()) {
+            points.add(5);
+            updateCounter(points.get());
+        }
+
+        showPopupNotification("Bread Crate", message);
+    }
+
+    private Pair<String, Boolean> rollCosmeticReward() {
+        List<String> available = events != null ? events.getLockedCosmetics() : List.of();
+        boolean unlocked = !available.isEmpty() && random.nextDouble() < 0.65;
+
+        if (unlocked) {
+            String chosen = available.get(random.nextInt(available.size()));
+            if (events != null) events.onCosmeticUnlocked(chosen);
+            return new Pair<>(chosen, true);
+        }
+        return new Pair<>(null, false);
+    }
+
+    private void showPopupNotification(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.initOwner(stage);
+        alert.initStyle(StageStyle.UTILITY);
+        alert.show();
+        Platform.runLater(() -> {
+            Timer timer = new Timer(true);
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    Platform.runLater(alert::close);
+                }
+            }, 3500);
+        });
     }
 
     private void enableWindowDrag(Scene scene) {

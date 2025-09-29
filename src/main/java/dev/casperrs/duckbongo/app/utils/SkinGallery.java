@@ -9,6 +9,7 @@ import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.Cursor;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -40,6 +41,11 @@ public final class SkinGallery {
     private static final int MIN_COLUMNS = 4;   // Minimum number of columns to show
     
     public static void show(javafx.stage.Window owner, double x, double y, OnPick cb) {
+        show(owner, x, y, cb, Collections.emptySet(), Collections.emptySet());
+    }
+
+    public static void show(javafx.stage.Window owner, double x, double y, OnPick cb,
+                            Collection<String> unlockedPaths, Collection<String> lockedPaths) {
         Popup popup = new Popup(); 
         popup.setAutoHide(true);
         
@@ -74,6 +80,10 @@ public final class SkinGallery {
         double popupWidth = 450; // Default width
         int numColumns = Math.max(MIN_COLUMNS, (int)((popupWidth - 40) / COLUMN_WIDTH)); // Account for padding and scrollbar
         
+        // Normalize locked/unlocked collections
+        Set<String> unlockedSet = unlockedPaths == null ? Collections.emptySet() : new HashSet<>(unlockedPaths);
+        Set<String> lockedSet = lockedPaths == null ? Collections.emptySet() : new HashSet<>(lockedPaths);
+
         // Load skins in background
         executor.submit(() -> {
             try {
@@ -92,8 +102,10 @@ public final class SkinGallery {
                     content.getChildren().clear();
                     
                     // Add sections with consistent styling
-                    VBox ducksSection = createSection("Ducks", "/assets/skin_parts/ducks", true, cb, popup, ducks, numColumns);
-                    VBox watersSection = createSection("Waters", "/assets/skin_parts/waters", false, cb, popup, waters, numColumns);
+                    VBox ducksSection = createSection("Ducks", "/assets/skin_parts/ducks", true,
+                            cb, popup, ducks, numColumns, unlockedSet, lockedSet);
+                    VBox watersSection = createSection("Waters", "/assets/skin_parts/waters", false,
+                            cb, popup, waters, numColumns, unlockedSet, lockedSet);
                     
                     // Add some spacing between sections
                     ducksSection.setPadding(new Insets(0, 0, 10, 0));
@@ -140,13 +152,16 @@ public final class SkinGallery {
     }
     
     private static VBox createSection(String title, String folder, boolean duck, OnPick cb, 
-                                     Popup popup, List<String> skinFiles, int numColumns) {
-        VBox section = section(title, folder, duck, cb, popup, skinFiles, numColumns);
+                                     Popup popup, List<String> skinFiles, int numColumns,
+                                     Set<String> unlocked, Set<String> locked) {
+        VBox section = section(title, folder, duck, cb, popup, skinFiles, numColumns, unlocked, locked);
         section.setMaxWidth(Double.MAX_VALUE);
         return section;
     }
 
-    private static VBox section(String title, String folder, boolean duck, OnPick cb, Popup popup, List<String> skinFiles, int numColumns) {
+    private static VBox section(String title, String folder, boolean duck, OnPick cb, Popup popup,
+                                List<String> skinFiles, int numColumns,
+                                Set<String> unlocked, Set<String> locked) {
         Label header = new Label(title);
         header.setStyle("-fx-font-weight: bold; -fx-font-size: 14; -fx-padding: 4 0 6 0;");
         
@@ -166,32 +181,58 @@ public final class SkinGallery {
             // Create cell with loading state
             Label nameLabel = new Label(skinFile.replaceFirst("^(duck_|water_)", "").replace(".png", ""));
             nameLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #666;");
-            
+
             StackPane imageContainer = new StackPane();
             imageContainer.setMinSize(64, 64);
             imageContainer.setStyle("-fx-background-color: #f5f5f5; -fx-border-color: #eee; -fx-border-width: 1;");
-            
+
             VBox box = new VBox(4, imageContainer, nameLabel);
             box.setAlignment(Pos.CENTER);
             box.setPadding(new Insets(5));
-            
+
             StackPane cell = new StackPane(box);
             cell.setPadding(new Insets(4));
             cell.getStyleClass().add("skin-cell");
-            
-            cell.setOnMouseEntered(e -> cell.setStyle("-fx-background-color: #e0e0e0;"));
+
+            final String cpPath = folder + "/" + skinFile;
+            boolean unlockedProvided = unlocked != null && !unlocked.isEmpty();
+            boolean lockedProvided = locked != null && !locked.isEmpty();
+            boolean isUnlocked = unlockedProvided ? unlocked.contains(cpPath)
+                    : lockedProvided ? !locked.contains(cpPath) : true;
+
+            cell.setCursor(isUnlocked ? Cursor.HAND : Cursor.DEFAULT);
+            cell.setOpacity(isUnlocked ? 1.0 : 0.4);
+
+            cell.setOnMouseEntered(e -> {
+                if (isUnlocked) {
+                    cell.setStyle("-fx-background-color: #e0e0e0;");
+                }
+            });
             cell.setOnMouseExited(e -> cell.setStyle(""));
+
             final String skinFilePath = skinFile; // Create final copy for use in lambda
             cell.setOnMouseClicked(e -> {
+                if (!isUnlocked) {
+                    e.consume();
+                    return;
+                }
                 if (duck) cb.duck("/assets/skin_parts/ducks/" + skinFilePath);
                 else cb.water("/assets/skin_parts/waters/" + skinFilePath);
                 popup.hide();
             });
-            
+
             // Add loading shimmer
             StackPane loadingShimmer = createLoadingPlaceholder();
             cell.getChildren().add(loadingShimmer);
-            
+
+            if (!isUnlocked) {
+                Label lockedBadge = new Label("Locked");
+                lockedBadge.setStyle("-fx-background-color: rgba(0,0,0,0.65); -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 2 6 2 6; -fx-background-radius: 12;");
+                StackPane.setAlignment(lockedBadge, Pos.TOP_RIGHT);
+                StackPane.setMargin(lockedBadge, new Insets(4));
+                cell.getChildren().add(lockedBadge);
+            }
+
             // Store reference to update later
             cellMap.put(skinFile, cell);
             grid.getChildren().add(cell);
@@ -285,7 +326,7 @@ public final class SkinGallery {
         
         return placeholder;
     }
-    
+
     private static void loadImageAsync(String path, int width, int height, boolean preserveRatio, 
                                      boolean smooth, java.util.function.Consumer<Image> callback) {
         String cacheKey = path + "@" + width + "x" + height;
@@ -312,6 +353,16 @@ public final class SkinGallery {
                 e.printStackTrace();
             }
         });
+    }
+
+    /**
+     * Returns all skin resources within the given folder, prefixed with the folder path.
+     * Example input: "/assets/skin_parts/ducks"
+     */
+    public static List<String> listSkins(String folder) {
+        return files(folder).stream()
+            .map(name -> folder + "/" + name)
+            .collect(Collectors.toList());
     }
 
     private static List<String> files(String folder) {

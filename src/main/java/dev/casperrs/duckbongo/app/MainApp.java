@@ -1,13 +1,14 @@
 package dev.casperrs.duckbongo.app;
 
 import dev.casperrs.duckbongo.app.utils.DuckEvents;
+import dev.casperrs.duckbongo.app.utils.SkinGallery;
 import dev.casperrs.duckbongo.core.PointsManager;
 import dev.casperrs.duckbongo.dataHandler.DataHandler;
+import dev.casperrs.duckbongo.network.AssignId;
 import dev.casperrs.duckbongo.network.DuckState;
 import dev.casperrs.duckbongo.network.WorldState;
 import dev.casperrs.duckbongo.network.MoveOther;
 import dev.casperrs.duckbongo.input.InputHook;
-import dev.casperrs.duckbongo.network.AssignId;
 import dev.casperrs.duckbongo.ActivityExample;
 
 import javafx.animation.AnimationTimer;
@@ -21,8 +22,13 @@ import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Collections;
 
 public class MainApp extends Application {
 
@@ -48,6 +54,7 @@ public class MainApp extends Application {
     private long lastMoveSentMs = 0;
     // Per-target throttle for moving other users' ducks
     private final Map<Integer, Long> lastOtherMoveSentMs = new HashMap<>();
+    private final List<String> allCosmetics = new ArrayList<>();
 
     @Override
     public void start(Stage stage) {
@@ -56,23 +63,20 @@ public class MainApp extends Application {
 
         // === Persistence ===
         dataHandler.initAndLoad();
-        // Update counter to reflect loaded points
         overlay.updateCounter(points.get());
-        // Load saved skins
         try {
             overlay.changeDuckSkin(dataHandler.getCurrentDuckSkin());
             overlay.changeWaterSkin(dataHandler.getCurrentWaterSkin());
         } catch (Exception ignored) {}
-        // Apply saved preferences
         overlay.setShowNames(dataHandler.getShowNames());
         overlay.setMovementSyncEnabled(dataHandler.getMovementSync());
 
+        ensureCosmeticList();
+
         // === Discord Rich Presence (optional) ===
         try {
-            // Start Discord SDK and set initial activity; runs callbacks on background thread
             ActivityExample.runActivityHook(points);
         } catch (Throwable t) {
-            // Catch NoClassDefFoundError and other linkage issues too
             System.out.println("⚠️ Failed to init Discord activity: " + t);
         }
 
@@ -88,7 +92,6 @@ public class MainApp extends Application {
 
         // === Input Hook (adds points) ===
         try {
-            // Forward input-driven updates to Discord activity (details/state)
             inputHook = new InputHook(points, ActivityExample::updateActivity);
             inputHook.start();
         } catch (Exception e) {
@@ -97,6 +100,26 @@ public class MainApp extends Application {
 
         // === Wire overlay → network (local authority) ===
         overlay.setEvents(new DuckEvents() {
+            @Override
+            public void onCosmeticUnlocked(String cosmeticId) {
+                if (cosmeticId == null) return;
+                boolean added = dataHandler.addUnlockedCosmetic(cosmeticId);
+                if (added) {
+                    System.out.println("Unlocked cosmetic: " + cosmeticId);
+                }
+            }
+
+            @Override
+            public List<String> getLockedCosmetics() {
+                ensureCosmeticList();
+                return dataHandler.getLockedCosmetics(allCosmetics);
+            }
+
+            @Override
+            public Set<String> getUnlockedCosmetics() {
+                return dataHandler.getUnlockedCosmetics();
+            }
+
             @Override
             public void onPositionChanged(float x, float y) {
                 if (!connected || client == null) return;
@@ -383,6 +406,13 @@ public class MainApp extends Application {
         } catch (Exception e) {
             System.err.println("⚠️ Failed to update Discord activity: " + e.getMessage());
         }
+    }
+
+    private void ensureCosmeticList() {
+        if (!allCosmetics.isEmpty()) return;
+        allCosmetics.addAll(SkinGallery.listSkins("/assets/skin_parts/ducks"));
+        allCosmetics.addAll(SkinGallery.listSkins("/assets/skin_parts/waters"));
+        Collections.sort(allCosmetics);
     }
 
     public static void main(String[] args) {

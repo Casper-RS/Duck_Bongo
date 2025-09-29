@@ -41,6 +41,11 @@ public class DatabaseConnection {
             try (Statement alter = c.createStatement()) {
                 alter.executeUpdate("ALTER TABLE UserData ADD COLUMN MovementSync INTEGER NOT NULL DEFAULT 1");
             } catch (SQLException ignored) { /* column may already exist */ }
+
+            // Migration: track unlocked cosmetics
+            try (Statement alter = c.createStatement()) {
+                alter.executeUpdate("ALTER TABLE UserData ADD COLUMN UnlockedCosmetics TEXT DEFAULT ''");
+            } catch (SQLException ignored) { /* column may already exist */ }
         }
     }
 }

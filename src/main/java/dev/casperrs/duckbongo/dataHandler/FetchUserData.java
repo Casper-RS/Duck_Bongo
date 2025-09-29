@@ -8,7 +8,7 @@ public class FetchUserData {
     public Optional<UserRecord> findById(String userId) throws SQLException {
         try (Connection c = DatabaseConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("""
-                SELECT UserID, Username, ClickCount, DuckSkin, WaterSkin, ShowNames, MovementSync
+                SELECT UserID, Username, ClickCount, DuckSkin, WaterSkin, ShowNames, MovementSync, UnlockedCosmetics
                 FROM UserData WHERE UserID = ?
             """)) {
             ps.setString(1, userId);
@@ -24,7 +24,7 @@ public class FetchUserData {
     public Optional<UserRecord> findByUsername(String username) throws SQLException {
         try (Connection c = DatabaseConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("""
-                SELECT UserID, Username, ClickCount, DuckSkin, WaterSkin, ShowNames, MovementSync
+                SELECT UserID, Username, ClickCount, DuckSkin, WaterSkin, ShowNames, MovementSync, UnlockedCosmetics
                 FROM UserData WHERE Username = ?
             """)) {
             ps.setString(1, username);
@@ -38,8 +38,8 @@ public class FetchUserData {
     public UserRecord create(String userId, String username) throws SQLException {
         try (Connection c = DatabaseConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("""
-                INSERT INTO UserData(UserID, Username, ClickCount, DuckSkin, WaterSkin, ShowNames, MovementSync)
-                VALUES(?, ?, 0, '/assets/skin_parts/ducks/duck_default.png', '/assets/skin_parts/waters/water_default.png', 1, 1)
+                INSERT INTO UserData(UserID, Username, ClickCount, DuckSkin, WaterSkin, ShowNames, MovementSync, UnlockedCosmetics)
+                VALUES(?, ?, 0, '/assets/skin_parts/ducks/duck_default.png', '/assets/skin_parts/waters/water_default.png', 1, 1, '')
             """)) {
             ps.setString(1, userId);
             ps.setString(2, username);
@@ -48,7 +48,8 @@ public class FetchUserData {
                     "/assets/skin_parts/ducks/duck_default.png",
                     "/assets/skin_parts/waters/water_default.png",
                     true,
-                    true);
+                    true,
+                    "");
         }
     }
 
@@ -90,6 +91,18 @@ public class FetchUserData {
         }
     }
 
+    public void updateUnlockedCosmetics(String userId, String unlockedCsv) throws SQLException {
+        try (Connection c = DatabaseConnection.getConnection();
+             PreparedStatement ps = c.prepareStatement("""
+                UPDATE UserData SET UnlockedCosmetics = ?
+                WHERE UserID = ?
+            """)) {
+            ps.setString(1, unlockedCsv);
+            ps.setString(2, userId);
+            ps.executeUpdate();
+        }
+    }
+
     private UserRecord map(ResultSet rs) throws SQLException {
         return new UserRecord(
                 rs.getString("UserID"),
@@ -98,12 +111,14 @@ public class FetchUserData {
                 rs.getString("DuckSkin"),
                 rs.getString("WaterSkin"),
                 rs.getInt("ShowNames") != 0,
-                rs.getInt("MovementSync") != 0
+                rs.getInt("MovementSync") != 0,
+                rs.getString("UnlockedCosmetics")
         );
     }
 
     // Simpele DTO
     public record UserRecord(String userId, String username, long clickCount,
                              String duckSkin, String waterSkin,
-                             boolean showNames, boolean movementSync) {}
+                             boolean showNames, boolean movementSync,
+                             String unlockedCosmetics) {}
 }

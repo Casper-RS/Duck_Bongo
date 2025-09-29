@@ -7,9 +7,8 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class DataHandler {
     private static final String FILE_NAME = System.getProperty("user.home") + File.separator + ".duckbongo" + File.separator + "duck_data.properties";
@@ -21,11 +20,83 @@ public class DataHandler {
 
     private String currentUserId;
     private FetchUserData.UserRecord currentUser;
+    private final Set<String> unlockedCosmetics = new HashSet<>();
 
     private final PointsManager points;
 
     public DataHandler(PointsManager points) {
         this.points = points;
+    }
+
+    public Set<String> getUnlockedCosmetics() {
+        return Collections.unmodifiableSet(unlockedCosmetics);
+    }
+
+    public boolean addUnlockedCosmetic(String cosmeticPath) {
+        if (cosmeticPath == null || cosmeticPath.isBlank()) return false;
+        boolean added = unlockedCosmetics.add(cosmeticPath);
+        if (added) {
+            persistUnlockedCosmetics();
+        }
+        return added;
+    }
+
+    public List<String> getLockedCosmetics(Collection<String> allCosmetics) {
+        if (allCosmetics == null) return List.of();
+        return allCosmetics.stream()
+                .filter(c -> !unlockedCosmetics.contains(c))
+                .collect(Collectors.toList());
+    }
+
+    private void reloadUnlockedCosmetics() {
+        unlockedCosmetics.clear();
+        if (currentUser == null) return;
+        String csv = currentUser.unlockedCosmetics();
+        if (csv != null && !csv.isBlank()) {
+            Arrays.stream(csv.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .forEach(unlockedCosmetics::add);
+        }
+        boolean changed = false;
+        if (ensureUnlocked(currentUser.duckSkin())) changed = true;
+        if (ensureUnlocked(currentUser.waterSkin())) changed = true;
+        if (changed) {
+            persistUnlockedCosmetics();
+        }
+    }
+
+    private boolean ensureUnlocked(String cosmeticPath) {
+        if (cosmeticPath == null || cosmeticPath.isBlank()) return false;
+        return unlockedCosmetics.add(cosmeticPath);
+    }
+
+    private void persistUnlockedCosmetics() {
+        if (currentUserId == null) return;
+        String csv = serializeUnlockedCosmetics();
+        try {
+            data.updateUnlockedCosmetics(currentUserId, csv);
+            if (currentUser != null) {
+                currentUser = new FetchUserData.UserRecord(
+                        currentUser.userId(),
+                        currentUser.username(),
+                        currentUser.clickCount(),
+                        currentUser.duckSkin(),
+                        currentUser.waterSkin(),
+                        currentUser.showNames(),
+                        currentUser.movementSync(),
+                        csv
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String serializeUnlockedCosmetics() {
+        return unlockedCosmetics.stream()
+                .sorted()
+                .collect(Collectors.joining(","));
     }
 
     /** Call bij app-start */
@@ -68,6 +139,8 @@ public class DataHandler {
             points.add(currentUser.clickCount());
             System.out.println("Loaded clicks for " + currentUser.username() + ": " + currentUser.clickCount());
 
+            reloadUnlockedCosmetics();
+
         } catch (SQLException e) {
             throw new RuntimeException("Database init/load failed", e);
         }
@@ -80,6 +153,7 @@ public class DataHandler {
             long current = points.get();
             data.updateClickCount(currentUserId, current);
             System.out.println("Saved clicks (" + current + ") for " + currentUser.username());
+            persistUnlockedCosmetics();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -114,9 +188,12 @@ public class DataHandler {
                         duckSkin,
                         waterSkin,
                         currentUser.showNames(),
-                        currentUser.movementSync()
+                        currentUser.movementSync(),
+                        serializeUnlockedCosmetics()
                 );
             }
+            ensureUnlocked(duckSkin);
+            ensureUnlocked(waterSkin);
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -142,7 +219,8 @@ public class DataHandler {
                         currentUser.duckSkin(),
                         currentUser.waterSkin(),
                         showNames,
-                        movementSync
+                        movementSync,
+                        serializeUnlockedCosmetics()
                 );
             }
         } catch (SQLException e) {

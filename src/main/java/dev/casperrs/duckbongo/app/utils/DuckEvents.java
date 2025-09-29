@@ -13,4 +13,8 @@ public interface DuckEvents {
     // Preferences
     void onShowNamesChanged(boolean showNames);
     void onMovementSyncChanged(boolean enabled);
+    // Bread crates
+    java.util.List<String> getLockedCosmetics();
+    java.util.Set<String> getUnlockedCosmetics();
+    void onCosmeticUnlocked(String cosmeticId);
 }
