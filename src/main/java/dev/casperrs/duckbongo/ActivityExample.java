@@ -111,10 +111,33 @@ public class ActivityExample {
         inLobby = true;
         currentPlayers = 1;
         ActivityExample.maxPlayers = maxPlayers;
-        lobbyId = UUID.randomUUID().toString();
+        lobbyId = UUID.randomUUID().toString().substring(0, 6).toUpperCase(); // Shorter, more readable ID
         joinRequestCallback = onJoinRequest;
         
-        updateLobbyActivity(true);
+        // Set up the activity with proper permissions
+        try (Activity activity = new Activity()) {
+            activity.setDetails("In Lobby");
+            activity.setState("Players: 1/" + maxPlayers);
+            
+            // Set up party information
+            ActivityParty party = activity.party();
+            party.size().setCurrentSize(1);
+            party.size().setMaxSize(maxPlayers);
+            party.setID("party_" + lobbyId);
+            
+            // Set up join secret
+            ActivitySecrets secrets = activity.secrets();
+            secrets.setJoinSecret("join_" + lobbyId);
+            
+            // Set activity type and enable join requests
+            activity.setType(ActivityType.PLAYING);
+            // Note: The Discord SDK should automatically handle join requests with the join secret
+            
+            // Update the activity
+            core.activityManager().updateActivity(activity);
+        }
+        
+        System.out.println("Created lobby with ID: " + lobbyId);
         return lobbyId;
     }
 

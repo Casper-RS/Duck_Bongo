@@ -34,7 +34,7 @@ public class MainApp extends Application {
     private InputHook inputHook;
     private Client client;
     private volatile boolean connected = false;
-    private volatile String serverIP = "localhost"; //13.62.96.190
+    private volatile String serverIP = "192.168.178.109"; //13.62.96.190
 
     // Optional: tiny throttle if you want to send heartbeat occasionally (ms)
     private static final long HEARTBEAT_MS = 0; // set to 0 to disable heartbeat
@@ -90,7 +90,17 @@ public class MainApp extends Application {
                     
                     if (currentLobbyId != null) {
                         isLobbyHost = true;
-                        connectToServer("localhost"); // TODO: Get actual server IP
+                        // Show the lobby ID to the user
+                        Platform.runLater(() -> {
+                            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                            alert.setTitle("Lobby Created");
+                            alert.setHeaderText("Share this lobby ID with friends:");
+                            alert.setContentText(currentLobbyId);
+                            alert.showAndWait();
+                            
+                            // Connect to the server after showing the lobby ID
+                            connectToServer("localhost"); // TODO: Get actual server IP
+                        });
                     }
                 }
                 
