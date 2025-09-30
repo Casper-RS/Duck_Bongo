@@ -43,6 +43,9 @@ public class DuckOverlay {
     private static final int BAR_WIDTH  = 100;
     private static final int BAR_HEIGHT = 22;
     private static final int MENU_ICON  = 22;
+    private static final double BREAD_IMAGE_WIDTH = 40;
+    private static final double BREAD_VISUAL_SIZE = 44;
+    private static final double BREAD_GAP = -100;
 
     private final PointsManager points;
     private final Stage stage;
@@ -116,20 +119,31 @@ public class DuckOverlay {
 
         // Top stack with duck
         StackPane localStack = new StackPane(localDuck.node()); // bread icon weggelaten voor eenvoud
-        localStack.setAlignment(Pos.CENTER_LEFT);
+        localStack.setAlignment(Pos.CENTER);
+        localStack.setMinWidth(DUCK_WIDTH);
+        localStack.setPrefWidth(DUCK_WIDTH);
+        localStack.setMaxWidth(DUCK_WIDTH);
 
         breadContainer = new StackPane();
         breadContainer.setPickOnBounds(false);
+        breadContainer.setManaged(false);
         breadContainer.setOpacity(0);
         breadContainer.setVisible(false);
         breadContainer.getChildren().add(createBreadNode());
         StackPane.setAlignment(breadContainer, Pos.CENTER_LEFT);
+        breadContainer.setTranslateX(-DUCK_WIDTH / 2.0 - BREAD_GAP - BREAD_VISUAL_SIZE / 2.0);
+        breadContainer.setTranslateY(40);
 
-        HBox barRow = new HBox(6, counterBar, hamburger, breadContainer);
+        localStack.getChildren().add(breadContainer);
+
+        HBox barRow = new HBox(6, counterBar, hamburger);
         barRow.setAlignment(Pos.CENTER);
+        barRow.setMinWidth(DUCK_WIDTH);
+        barRow.setPrefWidth(DUCK_WIDTH);
+        barRow.setMaxWidth(DUCK_WIDTH);
 
         column = new VBox(-32, localStack, barRow);
-        column.setAlignment(Pos.TOP_LEFT);
+        column.setAlignment(Pos.TOP_CENTER);
         column.setPadding(new Insets(2, 4, 4, 4));
 
         othersLayer = new Group();
@@ -514,11 +528,8 @@ public class DuckOverlay {
             Clipboard.getSystemClipboard().setContent(content);
         });
 
-        MenuItem addOne = new MenuItem("Add 1 bread (test)");
-        addOne.setOnAction(e -> { points.add(1); updateCounter(points.get()); punch(); });
-
-        MenuItem spawnBread = new MenuItem("Spawn bread now");
-        spawnBread.setOnAction(e -> spawnBread());
+//        MenuItem spawnBread = new MenuItem("Spawn bread now");
+//        spawnBread.setOnAction(e -> spawnBread());
 
         MenuItem toggleTop = new MenuItem("Toggle always-on-top");
         toggleTop.setOnAction(e -> stage.setAlwaysOnTop(!stage.isAlwaysOnTop()));
@@ -564,7 +575,15 @@ public class DuckOverlay {
         MenuItem exit = new MenuItem("Exit");
         exit.setOnAction(e -> { stage.close(); Platform.exit(); System.exit(0); });
 
-        return new ContextMenu(setIp, skinPopup, addOne, spawnBread, copyCount, toggleTop, toggleNamesItem, toggleMovementItem, exit);
+        return new ContextMenu(
+                setIp,
+                skinPopup,
+//                spawnBread,
+                copyCount,
+                toggleTop,
+                toggleNamesItem,
+                toggleMovementItem,
+                exit);
     }
 
     private void scheduleBreadDrops() {
