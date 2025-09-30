@@ -195,10 +195,17 @@ public final class SkinGallery {
             cell.getStyleClass().add("skin-cell");
 
             final String cpPath = folder + "/" + skinFile;
-            boolean unlockedProvided = unlocked != null && !unlocked.isEmpty();
-            boolean lockedProvided = locked != null && !locked.isEmpty();
-            boolean isUnlocked = unlockedProvided ? unlocked.contains(cpPath)
-                    : lockedProvided ? !locked.contains(cpPath) : true;
+            boolean isUnlocked;
+            boolean hasUnlocked = unlocked != null && !unlocked.isEmpty();
+            boolean hasLocked = locked != null && !locked.isEmpty();
+
+            if (hasUnlocked) {
+                isUnlocked = unlocked.contains(cpPath);
+            } else if (hasLocked) {
+                isUnlocked = !locked.contains(cpPath);
+            } else {
+                isUnlocked = false; // default to locked until we know otherwise
+            }
 
             cell.setCursor(isUnlocked ? Cursor.HAND : Cursor.DEFAULT);
             cell.setOpacity(isUnlocked ? 1.0 : 0.4);

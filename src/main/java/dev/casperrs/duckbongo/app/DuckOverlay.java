@@ -650,7 +650,8 @@ public class DuckOverlay {
         }
 
         String message = reward.getValue()
-                ? "New cosmetic unlocked: " + reward.getKey()
+//                ? "New cosmetic unlocked: " + reward.getKey()
+                ? "New cosmetic unlocked: " + formatCosmeticName(reward.getKey())
                 : "You got some crumbs and +5 points";
 
         if (!reward.getValue()) {
@@ -671,6 +672,57 @@ public class DuckOverlay {
             return new Pair<>(chosen, true);
         }
         return new Pair<>(null, false);
+    }
+
+    private static String formatCosmeticName(String path) {
+        if (path == null || path.isBlank()) return "Unknown skin";
+
+        String name = path;
+        int slash = name.lastIndexOf('/');
+        if (slash >= 0 && slash < name.length() - 1) {
+            name = name.substring(slash + 1);
+        }
+        if (name.endsWith(".png")) {
+            name = name.substring(0, name.length() - 4);
+        }
+
+        String prefix = "";
+        if (name.startsWith("duck_")) {
+            prefix = "Duck ";
+            name = name.substring("duck_".length());
+        } else if (name.startsWith("water_")) {
+            prefix = "Water ";
+            name = name.substring("water_".length());
+        }
+
+        name = name.replace('_', ' ');
+
+        StringBuilder friendly = new StringBuilder(prefix);
+        boolean capitalizeNext = true;
+        for (char c : name.toCharArray()) {
+            if (friendly.length() == 0 || Character.isWhitespace(friendly.charAt(friendly.length() - 1))) {
+                capitalizeNext = true;
+            }
+
+            if (Character.isWhitespace(c)) {
+                capitalizeNext = true;
+                friendly.append(c);
+                continue;
+            }
+
+            if (capitalizeNext) {
+                friendly.append(Character.toTitleCase(c));
+                capitalizeNext = false;
+            } else {
+                friendly.append(Character.toLowerCase(c));
+            }
+        }
+
+        String result = friendly.toString().trim();
+        if (!prefix.isEmpty() && !result.startsWith("Duck") && !result.startsWith("Water")) {
+            result = prefix.trim() + (result.isEmpty() ? "" : " " + result);
+        }
+        return result;
     }
 
     private void showPopupNotification(String title, String message) {

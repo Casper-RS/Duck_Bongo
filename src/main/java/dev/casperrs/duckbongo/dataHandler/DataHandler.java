@@ -14,6 +14,8 @@ public class DataHandler {
     private static final String FILE_NAME = System.getProperty("user.home") + File.separator + ".duckbongo" + File.separator + "duck_data.properties";
     private static final String USER_ID = "UUID";
     private static final String KEY_CLICKS = "clicks";
+    private static final String DEFAULT_DUCK_SKIN = "/assets/skin_parts/ducks/duck_default.png";
+    private static final String DEFAULT_WATER_SKIN = "/assets/skin_parts/waters/water_default.png";
 
     private final Properties props = new Properties();
     private final FetchUserData data = new FetchUserData();
@@ -58,10 +60,27 @@ public class DataHandler {
                     .filter(s -> !s.isEmpty())
                     .forEach(unlockedCosmetics::add);
         }
-        boolean changed = false;
-        if (ensureUnlocked(currentUser.duckSkin())) changed = true;
-        if (ensureUnlocked(currentUser.waterSkin())) changed = true;
-        if (changed) {
+        enforceEquippedSkinUnlocked();
+    }
+
+    private void enforceEquippedSkinUnlocked() {
+        boolean updated = false;
+
+        String duckSkin = currentUser != null ? currentUser.duckSkin() : null;
+        if (duckSkin != null && !duckSkin.isBlank() && !unlockedCosmetics.contains(duckSkin)) {
+            updateSkinsInternal(DEFAULT_DUCK_SKIN, null);
+            unlockedCosmetics.add(DEFAULT_DUCK_SKIN);
+            updated = true;
+        }
+
+        String waterSkin = currentUser != null ? currentUser.waterSkin() : null;
+        if (waterSkin != null && !waterSkin.isBlank() && !unlockedCosmetics.contains(waterSkin)) {
+            updateSkinsInternal(null, DEFAULT_WATER_SKIN);
+            unlockedCosmetics.add(DEFAULT_WATER_SKIN);
+            updated = true;
+        }
+
+        if (updated) {
             persistUnlockedCosmetics();
         }
     }
@@ -166,13 +185,13 @@ public class DataHandler {
     public String getCurrentDuckSkin() {
         return (currentUser != null && currentUser.duckSkin() != null)
                 ? currentUser.duckSkin()
-                : "/assets/skin_parts/ducks/duck_default.png";
+                : DEFAULT_DUCK_SKIN;
     }
 
     public String getCurrentWaterSkin() {
         return (currentUser != null && currentUser.waterSkin() != null)
                 ? currentUser.waterSkin()
-                : "/assets/skin_parts/waters/water_default.png";
+                : DEFAULT_WATER_SKIN;
     }
 
     public void updateSkins(String duckSkin, String waterSkin) {
@@ -192,8 +211,48 @@ public class DataHandler {
                         serializeUnlockedCosmetics()
                 );
             }
-            ensureUnlocked(duckSkin);
-            ensureUnlocked(waterSkin);
+            boolean changed = false;
+            if (ensureUnlocked(duckSkin)) changed = true;
+            if (ensureUnlocked(waterSkin)) changed = true;
+            if (changed) {
+                persistUnlockedCosmetics();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void updateSkinsInternal(String duckSkin, String waterSkin) {
+        if (currentUserId == null) return;
+
+        String resolvedDuck = duckSkin;
+        String resolvedWater = waterSkin;
+
+        if ((resolvedDuck == null || resolvedDuck.isBlank())) {
+            resolvedDuck = currentUser != null && currentUser.duckSkin() != null
+                    ? currentUser.duckSkin()
+                    : DEFAULT_DUCK_SKIN;
+        }
+        if ((resolvedWater == null || resolvedWater.isBlank())) {
+            resolvedWater = currentUser != null && currentUser.waterSkin() != null
+                    ? currentUser.waterSkin()
+                    : DEFAULT_WATER_SKIN;
+        }
+
+        try {
+            data.updateSkins(currentUserId, resolvedDuck, resolvedWater);
+            if (currentUser != null) {
+                currentUser = new FetchUserData.UserRecord(
+                        currentUser.userId(),
+                        currentUser.username(),
+                        currentUser.clickCount(),
+                        resolvedDuck,
+                        resolvedWater,
+                        currentUser.showNames(),
+                        currentUser.movementSync(),
+                        serializeUnlockedCosmetics()
+                );
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
