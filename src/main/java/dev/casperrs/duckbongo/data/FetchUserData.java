@@ -1,9 +1,12 @@
-package dev.casperrs.duckbongo.dataHandler;
+package dev.casperrs.duckbongo.data;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Optional;
 
-public class FetchUserData {
+public final class FetchUserData {
 
     public Optional<UserRecord> findById(String userId) throws SQLException {
         try (Connection c = DatabaseConnection.getConnection();
@@ -13,9 +16,7 @@ public class FetchUserData {
              """)) {
             ps.setString(1, userId);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(map(rs));
-                }
+                if (rs.next()) return Optional.of(map(rs));
                 return Optional.empty();
             }
         }
@@ -68,6 +69,5 @@ public class FetchUserData {
         );
     }
 
-    // Simpele DTO
     public record UserRecord(String userId, String username, long clickCount) {}
 }
